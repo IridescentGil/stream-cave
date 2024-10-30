@@ -1,47 +1,11 @@
 mod watcher;
+use crate::watcher::*;
 use std::path::{Path, PathBuf};
-
-#[derive(Debug)]
-pub enum Player {
-    Mpv,
-    Streamlink,
-}
-
-#[derive(Debug)]
-pub struct Settings {
-    pub player: Player,
-    pub schedule: PathBuf,
-}
-
-use serde::{Deserialize, Serialize};
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Streams {
-    names: Vec<String>,
-    quality_overides: Vec<Vec<(String, u16)>>,
-    streams_to_close_on: Vec<Vec<String>>,
-    streams_to_open_on: Vec<Vec<String>>,
-}
-
-impl Streams {
-    pub fn new() -> Self {
-        Self {
-            names: Vec::new(),
-            quality_overides: Vec::new(),
-            streams_to_close_on: Vec::new(),
-            streams_to_open_on: Vec::new(),
-        }
-    }
-}
-
-impl Default for Streams {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+use tokio::{sync::mpsc, task};
 
 pub fn read_config(_flags: Vec<String>, paths: Vec<PathBuf>) -> Settings {
     let mut player = Player::Mpv;
-    // TODO: Split schedule finder from config finder
+    // FIXME: Split schedule finder from config finder
     let mut schedule: PathBuf = PathBuf::new();
 
     for path in paths {
@@ -90,9 +54,60 @@ pub fn read_streams(path: &Path) -> Streams {
         }
     }
 }
-pub fn run(settings: Settings, streams: Streams) {
-    println!("settings: {:?}, streams: {:?}", settings, streams);
-    let player = settings.player;
+pub async fn run(settings: Settings, streams: Streams) {
+    let (file_watcher_twitch_websocket_sender, mut twitch_socket_file_watcher_reciever) =
+        mpsc::channel(10);
+    let (file_watcher_event_handler_sender, mut event_handler_file_watcher_reciever) =
+        mpsc::channel(10);
+    let (twitch_websocket_event_handler_sender, mut event_handler_twitch_websocket_reciever) =
+        mpsc::channel(10);
+    let (event_handler_task_spawner_sender, mut task_spawner_event_handler_reciever) =
+        mpsc::channel(10);
+    let (task_spawner_exit_handler_sender, mut exit_handler_task_spawner_reciever) =
+        mpsc::channel(10);
+    let (exit_handler_event_handler_sender, mut event_handler_exit_handler_reciever) =
+        mpsc::channel(10);
 
-    let player_func = crate::watcher::player::get_player_func(player);
+    tokio::join!(
+        task::spawn(async move {
+            file_watcher::file_watcher(
+                file_watcher_twitch_websocket_sender,
+                file_watcher_event_handler_sender,
+                &settings.schedule,
+                streams,
+            )
+            .await
+        }),
+        task::spawn(async move {
+            twitch_socket::twitch_websocket(
+                twitch_socket_file_watcher_reciever,
+                twitch_websocket_event_handler_sender,
+            )
+            .await
+        }),
+        task::spawn(async move {
+            event_handler::event_handler(
+                event_handler_twitch_websocket_reciever,
+                event_handler_exit_handler_reciever,
+                event_handler_file_watcher_reciever,
+                event_handler_task_spawner_sender,
+            )
+            .await
+        }),
+        task::spawn(async move {
+            tasks_handler::task_spawner(
+                task_spawner_event_handler_reciever,
+                task_spawner_exit_handler_sender,
+                &settings.player,
+            )
+            .await
+        }),
+        task::spawn(async move {
+            tasks_handler::exit_handler(
+                exit_handler_task_spawner_reciever,
+                exit_handler_event_handler_sender,
+            )
+            .await
+        })
+    );
 }

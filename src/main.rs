@@ -13,5 +13,5 @@ async fn main() {
 
     let settings = stream_watcher::read_config(flags, paths);
     let streams = stream_watcher::read_streams(&settings.schedule);
-    stream_watcher::run(settings, streams)
+    stream_watcher::run(settings, streams).await;
 }
