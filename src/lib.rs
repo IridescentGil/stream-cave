@@ -4,38 +4,36 @@ use std::path::{Path, PathBuf};
 use tokio::{sync::mpsc, task};
 
 pub fn read_config(_flags: Vec<String>, paths: Vec<PathBuf>) -> Settings {
-    let mut player = Player::Mpv;
-    // FIXME: Split schedule finder from config finder
-    let mut schedule: PathBuf = PathBuf::new();
+    let mut local_path = paths.last().unwrap_or(&PathBuf::new()).clone();
 
     for path in paths {
-        if path.as_path().join("config.conf").exists() {
-            let config = std::fs::read_to_string(path.join("config.conf"));
+        if path.as_path().join("config.json").exists() {
+            let config = std::fs::read_to_string(path.join("config.json"));
             match config {
-                Ok(settings) => {
-                    schedule = path;
-                    for line in settings.lines() {
-                        if line.contains("player:") {
-                            if line.contains("mpv") {
-                                player = Player::Mpv;
-                            } else if line.contains("streamlink") {
-                                player = Player::Streamlink;
-                            }
-                        }
+                Ok(settings) => match serde_json::from_str(&settings) {
+                    Ok(json) => return json,
+                    Err(error) => {
+                        eprintln!("Error deserializing data: {}", error);
+                        return Settings::new(path);
                     }
-                }
+                },
                 Err(error) => {
                     eprintln!("Error opening config file: {}", error);
-                    return Settings {
-                        player: Player::Mpv,
-                        schedule: path,
-                    };
+                    return Settings::new(path);
                 }
             }
         }
     }
+    let new_settings = Settings::new(local_path.clone());
+    if let Ok(data) = serde_json::to_string(&new_settings) {
+        std::fs::create_dir(&local_path).unwrap();
 
-    Settings { player, schedule }
+        local_path.push("config.json");
+
+        std::fs::write(local_path, data).unwrap();
+    }
+
+    new_settings
 }
 
 pub fn read_streams(path: &Path) -> Streams {
@@ -55,20 +53,19 @@ pub fn read_streams(path: &Path) -> Streams {
     }
 }
 pub async fn run(settings: Settings, streams: Streams) {
-    let (file_watcher_twitch_websocket_sender, mut twitch_socket_file_watcher_reciever) =
+    let (file_watcher_twitch_websocket_sender, twitch_socket_file_watcher_reciever) =
         mpsc::channel(10);
-    let (file_watcher_event_handler_sender, mut event_handler_file_watcher_reciever) =
+    let (file_watcher_event_handler_sender, event_handler_file_watcher_reciever) =
         mpsc::channel(10);
-    let (twitch_websocket_event_handler_sender, mut event_handler_twitch_websocket_reciever) =
+    let (twitch_websocket_event_handler_sender, event_handler_twitch_websocket_reciever) =
         mpsc::channel(10);
-    let (event_handler_task_spawner_sender, mut task_spawner_event_handler_reciever) =
+    let (event_handler_task_spawner_sender, task_spawner_event_handler_reciever) =
         mpsc::channel(10);
-    let (task_spawner_exit_handler_sender, mut exit_handler_task_spawner_reciever) =
-        mpsc::channel(10);
-    let (exit_handler_event_handler_sender, mut event_handler_exit_handler_reciever) =
+    let (task_spawner_exit_handler_sender, exit_handler_task_spawner_reciever) = mpsc::channel(10);
+    let (exit_handler_event_handler_sender, event_handler_exit_handler_reciever) =
         mpsc::channel(10);
 
-    tokio::join!(
+    let (first_task, second_task, third_task, fourth_task, fifth_task) = tokio::join!(
         task::spawn(async move {
             file_watcher::file_watcher(
                 file_watcher_twitch_websocket_sender,
@@ -110,4 +107,20 @@ pub async fn run(settings: Settings, streams: Streams) {
             .await
         })
     );
+
+    if let Err(error) = first_task {
+        eprintln!("Error encountered in task: {}", error);
+    }
+    if let Err(error) = second_task {
+        eprintln!("Error encountered in task: {}", error);
+    }
+    if let Err(error) = third_task {
+        eprintln!("Error encountered in task: {}", error);
+    }
+    if let Err(error) = fourth_task {
+        eprintln!("Error encountered in task: {}", error);
+    }
+    if let Err(error) = fifth_task {
+        eprintln!("Error encountered in task: {}", error);
+    }
 }

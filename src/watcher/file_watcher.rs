@@ -8,7 +8,7 @@ use super::StreamConfig;
 pub async fn file_watcher(
     file_watcher_twitch_websocket_sender: Sender<u32>,
     file_watcher_event_handler_sender: Sender<StreamConfig>,
-    streams_path: &Path,
+    _streams_path: &Path,
     streams: Streams,
 ) {
     let streamers = streams.names.iter();
@@ -31,6 +31,7 @@ pub async fn file_watcher(
             .await
             .unwrap();
     }
+    // TODO: Add functionality to watch schedule file and send changes
 }
 
 #[cfg(test)]

@@ -7,16 +7,34 @@ pub mod twitch_socket;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Player {
     Mpv,
     Streamlink,
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Settings {
+    ver: (u8, u8),
     pub player: Player,
     pub schedule: PathBuf,
+    pub profile: (String, u16),
+}
+
+impl Settings {
+    pub fn new(path: PathBuf) -> Self {
+        let ver = (0, 1);
+        let player = Player::Mpv;
+        let schedule = path;
+        let profile = (String::from("normal"), 1080);
+
+        Settings {
+            ver,
+            player,
+            schedule,
+            profile,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
