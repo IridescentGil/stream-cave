@@ -95,7 +95,7 @@ pub async fn run(settings: Settings, streams: Streams) {
             tasks_handler::task_spawner(
                 task_spawner_event_handler_reciever,
                 task_spawner_exit_handler_sender,
-                &settings.player,
+                settings.player,
             )
             .await
         }),

@@ -7,7 +7,7 @@ pub mod twitch_socket;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub enum Player {
     Mpv,
     Streamlink,

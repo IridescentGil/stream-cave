@@ -78,10 +78,7 @@ async fn handle_event(
         }
     }
 
-    let task = (
-        format!("https://www.twitch.tv/{}", stream.1.clone()),
-        stream_quality,
-    );
+    let task = (stream.1.clone(), stream_quality);
     sender.send(task).await.unwrap();
 }
 
@@ -107,7 +104,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            Some((String::from("https://www.twitch.tv/kaicenat"), 1080)),
+            Some((String::from("kaicenat"), 1080)),
             event_reciever.recv().await
         );
     }
@@ -139,7 +136,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            Some((String::from("https://www.twitch.tv/kaicenat"), 480)),
+            Some((String::from("kaicenat"), 480)),
             event_reciever.recv().await
         );
     }
@@ -170,7 +167,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            Some((String::from("https://www.twitch.tv/kaicenat"), 480)),
+            Some((String::from("kaicenat"), 480)),
             event_reciever.recv().await
         );
     }
@@ -202,7 +199,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            Some((String::from("https://www.twitch.tv/kaicenat"), 1080)),
+            Some((String::from("kaicenat"), 1080)),
             event_reciever.recv().await
         );
     }

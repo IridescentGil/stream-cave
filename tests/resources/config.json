@@ -1,0 +1,12 @@
+{
+    "ver": [
+        0,
+        1
+    ],
+    "player": "Mpv",
+    "schedule": "./",
+    "profile": [
+        "normal",
+        1080
+    ]
+}
