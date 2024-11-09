@@ -1,0 +1,50 @@
+{
+    "names": [
+        [
+            "kaicenat",
+            641972806
+        ],
+        [
+            "hasanabi",
+            207813352
+        ],
+        [
+            "jynxzi",
+            411377640
+        ]
+    ],
+    "quality_overides": [
+        [
+            [
+                "normal",
+                480
+            ],
+            [
+                "low-data",
+                0
+            ]
+        ],
+        [
+            [
+                "normal",
+                480
+            ],
+            [
+                "low-data",
+                0
+            ]
+        ],
+        [
+            [
+                "normal",
+                480
+            ],
+            [
+                "low-data",
+                0
+            ]
+        ]
+    ],
+    "streams_to_close_on": [],
+    "streams_to_open_on": []
+}
