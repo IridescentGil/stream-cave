@@ -19,7 +19,6 @@ pub async fn get_stream<'a, 'b>(
                     .arg("--no-resume-playback")
                     .arg(format!("--ytdl-format=best[height<=?{}]", quality));
             }
-            println!("mpv: {:?}", mpv);
             mpv.status()
         }
         Player::Streamlink => {

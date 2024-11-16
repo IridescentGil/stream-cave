@@ -134,7 +134,7 @@ pub enum EventType {
     Rerun,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct SubscriptionBody {
     #[serde(rename = "type")]
     subscritpion_type: String,
@@ -146,7 +146,7 @@ pub struct SubscriptionBody {
 impl SubscriptionBody {
     pub fn new_live_sub(id: u32, session_id: String) -> Self {
         SubscriptionBody {
-            subscritpion_type: String::from("stream.live"),
+            subscritpion_type: String::from("stream.online"),
             version: String::from("1"),
             condition: ConditionSubscriptionBody {
                 user_id: id.to_string(),
@@ -162,4 +162,31 @@ impl SubscriptionBody {
 #[derive(Serialize, Debug)]
 pub struct ConditionSubscriptionBody {
     pub user_id: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct StreamSearch {
+    pub data: Vec<SearchData>,
+    pagination: Option<Pagination>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Pagination {
+    cursor: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct SearchData {
+    broadcaster_language: String,
+    broadcaster_login: String,
+    pub display_name: String,
+    game_id: String,
+    game_name: String,
+    id: String,
+    tag_ids: Option<Vec<String>>,
+    tags: Vec<String>,
+    pub is_live: bool,
+    thumbnail_url: String,
+    title: String,
+    started_at: String,
 }

@@ -1,7 +1,13 @@
 mod watcher;
 use crate::watcher::*;
-use std::path::{Path, PathBuf};
-use tokio::{sync::mpsc, task};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
+use tokio::{
+    sync::{mpsc, Mutex},
+    task,
+};
 
 pub fn read_config(_flags: Vec<String>, paths: Vec<PathBuf>) -> Settings {
     let mut local_path = paths.last().unwrap_or(&PathBuf::new()).clone();
@@ -53,6 +59,30 @@ pub fn read_streams(path: &Path) -> Streams {
     }
 }
 pub async fn run(settings: Settings, streams: Streams) {
+    #[cfg(debug_assertions)]
+    const TWITCH_WEBSOCKET_URL: &str = "ws://127.0.0.1:8080/ws";
+    #[cfg(debug_assertions)]
+    const TWITCH_API_URL: &str = "http://localhost:8080/eventsub/subscriptions";
+
+    #[cfg(not(debug_assertions))]
+    const TWITCH_WEBSOCKET_URL: &str = "wss://eventsub.wss.twitch.tv/ws";
+    #[cfg(not(debug_assertions))]
+    const TWITCH_API_URL: &str = "https://api.twitch.tv/helix/eventsub/subscriptions";
+
+    const CLIENT_ID: &str = "uty2ua26tqh28rzn3jketggzu98t6b";
+    const STREAMING_SITE: &str = "https://www.twitch.tv/";
+    const SEARCH_CHANNEL_API: &str = "https://api.twitch.tv/helix/search/channels";
+
+    //FIXME: create token creation function
+    let token = String::new();
+
+    let user_access_token = Arc::new(Mutex::new(token));
+    let client_id = Arc::new(Mutex::new(String::from(CLIENT_ID)));
+
+    let user_access_token_exit_handler = user_access_token.clone();
+    let user_access_token_websocket = user_access_token.clone();
+    let client_id_clone = client_id.clone();
+
     let (file_watcher_twitch_websocket_sender, twitch_socket_file_watcher_reciever) =
         mpsc::channel(10);
     let (file_watcher_event_handler_sender, event_handler_file_watcher_reciever) =
@@ -79,6 +109,9 @@ pub async fn run(settings: Settings, streams: Streams) {
             twitch_socket::twitch_websocket(
                 twitch_socket_file_watcher_reciever,
                 twitch_websocket_event_handler_sender,
+                TWITCH_WEBSOCKET_URL,
+                TWITCH_API_URL,
+                user_access_token_websocket,
             )
             .await
         }),
@@ -96,6 +129,7 @@ pub async fn run(settings: Settings, streams: Streams) {
                 task_spawner_event_handler_reciever,
                 task_spawner_exit_handler_sender,
                 settings.player,
+                STREAMING_SITE.to_string(),
             )
             .await
         }),
@@ -103,6 +137,9 @@ pub async fn run(settings: Settings, streams: Streams) {
             tasks_handler::exit_handler(
                 exit_handler_task_spawner_reciever,
                 exit_handler_event_handler_sender,
+                SEARCH_CHANNEL_API.to_string(),
+                user_access_token_exit_handler,
+                client_id_clone,
             )
             .await
         })

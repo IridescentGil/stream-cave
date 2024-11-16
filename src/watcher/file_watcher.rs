@@ -32,6 +32,9 @@ pub async fn file_watcher(
             .unwrap();
     }
     // TODO: Add functionality to watch schedule file and send changes
+    // Also watch stored token
+    // FIXME:
+    // clear stored token
 }
 
 #[cfg(test)]
