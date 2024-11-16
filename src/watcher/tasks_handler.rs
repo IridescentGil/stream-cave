@@ -225,19 +225,12 @@ mod tests {
         let api_url = format!("http://localhost:{}/mock/search/channels", PORT);
         let (process_sender, process_reciever) = mpsc::channel(10);
         let (exit_sender, exit_reciever) = mpsc::channel(10);
-        let (finished_sender, mut finished_reciever) = mpsc::channel(1);
 
-        task::spawn(async move {
-            let mut child = Command::new("twitch-cli")
-                .args(["mock-api", "start", "-p", &PORT.to_string()])
-                .kill_on_drop(true)
-                .spawn()
-                .unwrap();
-
-            finished_reciever.recv().await.unwrap();
-
-            child.wait().await.unwrap()
-        });
+        let mut child = Command::new("twitch-cli")
+            .args(["mock-api", "start", "-p", &PORT.to_string()])
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
 
         task::spawn(async {
             sleep(Duration::from_secs(2)).await;
@@ -263,7 +256,8 @@ mod tests {
             .unwrap();
 
         assert!(exit_reciever.is_empty());
-        finished_sender.send(()).await.unwrap();
+        child.kill().await.unwrap();
+        child.wait().await.unwrap();
     }
 
     #[tokio::test]
@@ -272,20 +266,12 @@ mod tests {
         let api_url = format!("http://localhost:{}/mock/search/channels", PORT);
         let (process_sender, process_reciever) = mpsc::channel(10);
         let (exit_sender, mut exit_reciever) = mpsc::channel(10);
-        let (finished_sender, mut finished_reciever) = mpsc::channel(1);
 
-        task::spawn(async move {
-            let mut child = Command::new("twitch-cli")
-                .args(["mock-api", "start", "-p", &PORT.to_string()])
-                .kill_on_drop(true)
-                .spawn()
-                .unwrap();
-
-            finished_reciever.recv().await.unwrap();
-
-            child.kill().await.unwrap();
-            child.wait().await.unwrap()
-        });
+        let mut child = Command::new("twitch-cli")
+            .args(["mock-api", "start", "-p", &PORT.to_string()])
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
 
         task::spawn(async {
             sleep(Duration::from_secs(2)).await;
@@ -314,7 +300,8 @@ mod tests {
             exit_reciever.recv().await,
             Some((String::from("retry"), String::from("FisherMarston19")))
         );
-        finished_sender.send(()).await.unwrap();
+        child.kill().await.unwrap();
+        child.wait().await.unwrap();
     }
 
     #[tokio::test]
@@ -323,20 +310,12 @@ mod tests {
         let api_url = format!("http://localhost:{}/mock/search/channels", PORT);
         let (process_sender, process_reciever) = mpsc::channel(10);
         let (exit_sender, exit_reciever) = mpsc::channel(10);
-        let (finished_sender, mut finished_reciever) = mpsc::channel(1);
 
-        task::spawn(async move {
-            let mut child = Command::new("twitch-cli")
-                .args(["mock-api", "start", "-p", &PORT.to_string()])
-                .kill_on_drop(true)
-                .spawn()
-                .unwrap();
-
-            finished_reciever.recv().await.unwrap();
-
-            child.kill().await.unwrap();
-            child.wait().await.unwrap()
-        });
+        let mut child = Command::new("twitch-cli")
+            .args(["mock-api", "start", "-p", &PORT.to_string()])
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
 
         task::spawn(async {
             sleep(Duration::from_secs(2)).await;
@@ -362,7 +341,8 @@ mod tests {
             .unwrap();
 
         assert!(exit_reciever.is_empty());
-        finished_sender.send(()).await.unwrap();
+        child.kill().await.unwrap();
+        child.wait().await.unwrap();
     }
 
     #[tokio::test]
@@ -394,7 +374,7 @@ mod tests {
             .unwrap();
 
         tokio::time::timeout(
-            Duration::from_secs(15),
+            Duration::from_secs(5),
             exit_handler(
                 process_reciever,
                 exit_sender,
