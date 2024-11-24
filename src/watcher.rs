@@ -1,3 +1,4 @@
+pub mod authentication;
 pub mod event_handler;
 pub mod file_watcher;
 pub mod player;

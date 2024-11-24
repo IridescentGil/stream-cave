@@ -1,7 +1,7 @@
 use crate::watcher::Streams;
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 
-use tokio::sync::mpsc::Sender;
+use tokio::sync::{mpsc::Sender, Mutex};
 
 use super::StreamConfig;
 
@@ -9,12 +9,16 @@ pub async fn file_watcher(
     file_watcher_twitch_websocket_sender: Sender<u32>,
     file_watcher_event_handler_sender: Sender<StreamConfig>,
     _streams_path: &Path,
-    streams: Streams,
+    streams: &Arc<Mutex<Streams>>,
 ) {
-    let streamers = streams.names.iter();
-    let mut quality_iter = streams.quality_overides.iter();
-    let mut open_on_iter = streams.streams_to_open_on.iter();
-    let mut close_on_iter = streams.streams_to_close_on.iter();
+    let streamers = streams.lock().await.names.clone();
+    let streamers = streamers.iter();
+    let quality_iter = streams.lock().await.quality_overides.clone();
+    let mut quality_iter = quality_iter.iter();
+    let open_on_iter = streams.lock().await.streams_to_open_on.clone();
+    let mut open_on_iter = open_on_iter.iter();
+    let close_on_iter = streams.lock().await.streams_to_close_on.clone();
+    let mut close_on_iter = close_on_iter.iter();
     for streamer in streamers {
         file_watcher_twitch_websocket_sender
             .send(streamer.1)
@@ -32,9 +36,6 @@ pub async fn file_watcher(
             .unwrap();
     }
     // TODO: Add functionality to watch schedule file and send changes
-    // Also watch stored token
-    // FIXME:
-    // clear stored token
 }
 
 #[cfg(test)]
@@ -49,6 +50,7 @@ mod test {
 
         let json_streams = std::fs::read_to_string("./tests/resources/schedule.json").unwrap();
         let streams: Streams = serde_json::from_str(&json_streams).unwrap();
+        let streams = Arc::new(Mutex::new(streams));
         let path = std::path::Path::new("./tests/resources");
 
         let kai = StreamConfig {
@@ -76,7 +78,7 @@ mod test {
         let (id_sender, mut id_reciever) = mpsc::channel(5);
         let (config_sender, mut config_reciever) = mpsc::channel(5);
 
-        file_watcher(id_sender, config_sender, path, streams).await;
+        file_watcher(id_sender, config_sender, path, &streams).await;
         assert_eq!(id_reciever.recv().await, Some(641972806));
         assert_eq!(id_reciever.recv().await, Some(207813352));
         assert_eq!(id_reciever.recv().await, Some(411377640));

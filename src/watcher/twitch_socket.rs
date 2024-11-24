@@ -1,12 +1,13 @@
 pub mod api_structs;
 
 use std::{sync::Arc, time::Duration};
+use twitch_oauth2::UserToken;
 
 use futures_util::StreamExt;
 use tokio::{
     net::TcpStream,
     sync::{
-        mpsc::{Receiver, Sender},
+        mpsc::{self, Receiver, Sender},
         Mutex,
     },
     task::{self, yield_now},
@@ -21,45 +22,47 @@ use tokio_tungstenite::{
 pub async fn twitch_websocket<'a: 'static>(
     mut twitch_socket_file_watcher_reciever: Receiver<u32>,
     twitch_websocket_event_handler_sender: Sender<(String, String)>,
+    restart_signal_sender: Sender<u8>,
     twitch_websocket_url: &'a str,
     twitch_api_url: &'a str,
-    twitch_user_access_token: Arc<Mutex<String>>,
+    twitch_user_access_token: Arc<Option<UserToken>>,
+    client_id: &'a str,
 ) {
-    let stream_name_recieved = Arc::new(Mutex::new(true));
-    let stream_name_clone = stream_name_recieved.clone();
+    let restart_signal_sender_clone = restart_signal_sender.clone();
+    let (first_name_signal_sender, mut first_name_signal_reciever) = mpsc::channel(1);
 
     let websocket_session_id = Arc::new(Mutex::new(String::new()));
     let session_id_clone = websocket_session_id.clone();
 
-    let user_access_token_clone = twitch_user_access_token.clone();
-
     task::spawn(async move {
-        while *stream_name_clone.lock().await {
-            yield_now().await;
-        }
+        first_name_signal_reciever.recv().await.unwrap();
 
         parse_stream_message(
             twitch_websocket_url,
             websocket_session_id,
             twitch_websocket_event_handler_sender,
-            user_access_token_clone,
+            &restart_signal_sender,
         )
         .await;
     });
 
     task::spawn(async move {
-        while *stream_name_recieved.lock().await {
-            *stream_name_recieved.lock().await = twitch_socket_file_watcher_reciever.is_empty();
+        while twitch_socket_file_watcher_reciever.is_empty() {
+            yield_now().await;
         }
+        first_name_signal_sender.send(()).await.unwrap();
+
         while session_id_clone.lock().await.is_empty() {
             yield_now().await;
         }
         while let Some(id) = twitch_socket_file_watcher_reciever.recv().await {
             subscribe_to_event(
+                &restart_signal_sender_clone,
                 twitch_api_url,
-                twitch_user_access_token.clone(),
+                &twitch_user_access_token,
                 id,
                 session_id_clone.lock().await.clone(),
+                client_id,
             )
             .await;
         }
@@ -70,7 +73,7 @@ async fn parse_stream_message(
     websocket_url: &str,
     websocket_session_id: Arc<Mutex<String>>,
     twitch_websocket_event_handler_sender: Sender<(String, String)>,
-    twitch_user_access_token: Arc<Mutex<String>>,
+    restart_signal_sender: &Sender<u8>,
 ) {
     let (mut ws_stream, _) = match connect_async(websocket_url).await {
         Ok(conect) => conect,
@@ -89,16 +92,15 @@ async fn parse_stream_message(
                 parse_twitch_webocket_messages(
                     connection,
                     &mut ws_stream,
-                    websocket_url,
                     &websocket_session_id,
                     &twitch_websocket_event_handler_sender,
-                    &twitch_user_access_token,
+                    restart_signal_sender,
                 )
                 .await;
             }
             None => {
                 eprintln!("Connection closed");
-                (ws_stream, _) = reconnect_websocket(websocket_url).await;
+                restart_signal_sender.send(1).await.unwrap();
             }
         }
     }
@@ -107,10 +109,9 @@ async fn parse_stream_message(
 async fn parse_twitch_webocket_messages<'a>(
     connection: Result<Message, Error>,
     ws_stream: &'a mut WebSocketStream<MaybeTlsStream<TcpStream>>,
-    websocket_url: &'a str,
     websocket_session_id: &'a Arc<Mutex<String>>,
     twitch_websocket_event_handler_sender: &'a Sender<(String, String)>,
-    twitch_user_access_token: &'a Arc<Mutex<String>>,
+    restart_signal_sender: &'a Sender<u8>,
 ) {
     match connection {
         Ok(message) => {
@@ -124,16 +125,15 @@ async fn parse_twitch_webocket_messages<'a>(
                     parsed.payload,
                     websocket_session_id,
                     twitch_websocket_event_handler_sender,
+                    restart_signal_sender,
                     ws_stream,
-                    twitch_user_access_token,
                 )
                 .await;
             }
         }
         Err(error) => {
             eprintln!("Error: {}\n reconnecting", error);
-
-            (*ws_stream, _) = reconnect_websocket(websocket_url).await;
+            restart_signal_sender.send(1).await.unwrap();
         }
     }
 }
@@ -143,8 +143,8 @@ async fn parse_twitch_websocket_json<'a>(
     payload: api_structs::WebsocketPayload,
     websocket_session_id: &'a Arc<Mutex<String>>,
     twitch_websocket_event_handler_sender: &'a Sender<(String, String)>,
+    restart_signal_sender: &'a Sender<u8>,
     ws_stream: &'a mut WebSocketStream<MaybeTlsStream<TcpStream>>,
-    twitch_user_access_token: &'a Arc<Mutex<String>>,
 ) {
     match metadata {
         api_structs::WebsocketMetadata::Reply(reply) => {
@@ -155,7 +155,7 @@ async fn parse_twitch_websocket_json<'a>(
                 notification,
                 payload,
                 twitch_websocket_event_handler_sender,
-                twitch_user_access_token,
+                restart_signal_sender,
             )
             .await;
         }
@@ -176,6 +176,7 @@ async fn parse_connection_reply_message<'a>(
             };
 
             *websocket_session_id.lock().await = welcome.session.id;
+            println!("successfully started websocket");
         }
         api_structs::MessageType::SessionReconnect => {
             let api_structs::WebsocketPayload::Connection(reconnect) = payload else {
@@ -188,6 +189,7 @@ async fn parse_connection_reply_message<'a>(
                 .unwrap();
 
             *ws_stream = new_stream;
+            println!("Changed connection due to reconnect request");
         }
         api_structs::MessageType::SessionKeepalive => {
             // Nothing to do
@@ -202,7 +204,7 @@ async fn parse_connection_notification_message(
     notification: api_structs::NotificationMetadata,
     payload: api_structs::WebsocketPayload,
     twitch_websocket_event_handler_sender: &Sender<(String, String)>,
-    twitch_user_access_token: &Arc<Mutex<String>>,
+    restart_signal_sender: &Sender<u8>,
 ) {
     match notification.message_type {
         api_structs::MessageType::Notification => {
@@ -237,10 +239,7 @@ async fn parse_connection_notification_message(
                 eprintln!(
                     "No user acess token or token has expired, please create new user access token"
                 );
-                twitch_user_access_token.lock().await.clear();
-                while twitch_user_access_token.lock().await.is_empty() {
-                    yield_now().await;
-                }
+                restart_signal_sender.send(1).await.unwrap();
             } else if subscription.subscription.status
                 == api_structs::SubscriptionStatus::UserRemoved
             {
@@ -294,10 +293,12 @@ async fn reconnect_websocket(
 }
 
 async fn subscribe_to_event(
+    restart_signal_sender: &Sender<u8>,
     api_url: &str,
-    user_access_token: Arc<Mutex<String>>,
+    user_access_token: &Arc<Option<UserToken>>,
     id: u32,
     session_id: String,
+    client_id: &str,
 ) {
     const MAX_WAIT: Duration = Duration::new(180, 0);
     let time = Duration::new(1, 0);
@@ -306,24 +307,23 @@ async fn subscribe_to_event(
     loop {
         let subscriber = reqwest::Client::new()
             .post(api_url)
-            .bearer_auth(user_access_token.lock().await)
-            .header("Client-Id", "uty2ua26tqh28rzn3jketggzu98t6b")
+            .bearer_auth((**user_access_token).clone().unwrap().access_token.as_str())
+            .header("Client-Id", client_id)
             .json(&subscription)
             .send()
             .await;
         match subscriber {
             Ok(response) => {
                 if response.status() == 401 {
-                    user_access_token.lock().await.clear();
-                    while user_access_token.lock().await.is_empty() {
-                        yield_now().await;
-                    }
+                    restart_signal_sender.send(1).await.unwrap();
                 } else if response.status() != 202 {
                     println!(
                         "Error {}: \n{}",
                         response.status(),
                         response.text().await.unwrap()
                     );
+                } else {
+                    println!("Subscribed to event:\n{}", response.text().await.unwrap());
                 }
                 break;
             }
@@ -342,13 +342,26 @@ async fn subscribe_to_event(
 #[cfg(test)]
 mod tests {
 
-    use tokio::process;
+    use std::str::FromStr;
 
+    use tokio::{process, time::timeout};
+    use twitch_oauth2::AccessToken;
     #[tokio::test]
     async fn recieve_and_send() {
         const TWITCH_WEBSOCKET_URL: &str = "ws://127.0.0.1:3200/ws";
         const TWITCH_API_URL: &str = "http://localhost:3200/eventsub/subscriptions";
-        let twitch_user_access_token: Arc<Mutex<String>> = Arc::new(Mutex::new(String::from("")));
+
+        let user_access_token = Some(UserToken::from_existing_unchecked(
+            AccessToken::from_str("").unwrap(),
+            None,
+            "",
+            None,
+            "".into(),
+            "".into(),
+            Some(vec![]),
+            Some(Duration::from_secs(10000)),
+        ));
+        let twitch_user_access_token = Arc::new(user_access_token);
 
         use super::*;
         use tokio::sync::mpsc;
@@ -356,28 +369,23 @@ mod tests {
 
         let (id_sender, id_reciever) = mpsc::channel(10);
         let (socket_sender, mut socket_reciever) = mpsc::channel(10);
-        let (finished_sender, mut finished_reciever) = mpsc::channel(1);
+        let (restart_signal_sender, _) = mpsc::channel(1);
 
-        task::spawn(async move {
-            let mut child = process::Command::new("twitch-cli")
-                .args(["event", "websocket", "start-server", "-S", "-p", "3200"])
-                .kill_on_drop(true)
-                .spawn()
-                .unwrap();
-
-            finished_reciever.recv().await.unwrap();
-
-            child.kill().await.unwrap();
-            child.wait().await.unwrap()
-        });
+        let mut child = process::Command::new("twitch-cli")
+            .args(["event", "websocket", "start-server", "-S", "-p", "3200"])
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
 
         task::spawn(async {
             twitch_websocket(
                 id_reciever,
                 socket_sender,
+                restart_signal_sender,
                 TWITCH_WEBSOCKET_URL,
                 TWITCH_API_URL,
                 twitch_user_access_token,
+                "AAAA",
             )
             .await
         });
@@ -391,18 +399,22 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(
-            socket_reciever.recv().await,
+            timeout(Duration::from_secs(15), socket_reciever.recv())
+                .await
+                .unwrap(),
             Some((String::from("live"), String::from("testBroadcaster")))
         );
-        finished_sender.send(()).await.unwrap();
+        child.kill().await.unwrap();
+        child.wait().await.unwrap();
     }
 
-    #[ignore = "Tst needs to be fixed, unknown if twitch cli can subscribe multiple times"]
+    #[ignore = "Test needs to be fixed, unknown if twitch cli can subscribe multiple times"]
     #[tokio::test]
     async fn recieve_and_send_multuple() {
         const TWITCH_WEBSOCKET_URL: &str = "ws://127.0.0.1:8080/ws";
         const TWITCH_API_URL: &str = "http://localhost:8080/eventsub/subscriptions";
-        let twitch_user_access_token: Arc<Mutex<String>> = Arc::new(Mutex::new(String::from("")));
+        let twitch_user_access_token = Arc::new(None);
+        let (restart_signal_sender, _) = mpsc::channel(1);
 
         use super::*;
         use tokio::sync::mpsc;
@@ -415,9 +427,11 @@ mod tests {
             twitch_websocket(
                 id_reciever,
                 socket_sender,
+                restart_signal_sender,
                 TWITCH_WEBSOCKET_URL,
                 TWITCH_API_URL,
                 twitch_user_access_token,
+                "AAAA",
             )
             .await
         });

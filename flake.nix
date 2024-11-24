@@ -50,7 +50,6 @@
             cargo-mutants
             cargo-nextest
             cargo-fuzz
-            # cargo-llvm-cov
           ];
         };
       }

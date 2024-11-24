@@ -1,13 +1,11 @@
 use crate::watcher::twitch_socket::api_structs;
 use std::{process::ExitStatus, sync::Arc, time::Duration};
+use twitch_oauth2::UserToken;
 
 use crate::{watcher::player, Player};
 use tokio::{
-    sync::{
-        mpsc::{Receiver, Sender},
-        Mutex,
-    },
-    task::{self, yield_now},
+    sync::mpsc::{Receiver, Sender},
+    task,
     time::sleep,
 };
 
@@ -38,9 +36,10 @@ pub async fn exit_handler(
         Result<std::process::ExitStatus, std::io::Error>,
     )>,
     exit_handler_event_handler_sender: Sender<(String, String)>,
+    restart_signal_sender: Sender<u8>,
     api_url: String,
-    user_access_token: Arc<Mutex<String>>,
-    client_id: Arc<Mutex<String>>,
+    user_access_token: Arc<Option<UserToken>>,
+    client_id: &str,
 ) {
     while let Some((stream_name, result)) = exit_handler_task_spawner_reciever.recv().await {
         match result {
@@ -49,9 +48,10 @@ pub async fn exit_handler(
                     stream_name,
                     exit_status,
                     &exit_handler_event_handler_sender,
+                    &restart_signal_sender,
                     &api_url,
                     &user_access_token,
-                    &client_id,
+                    client_id,
                 )
                 .await;
             }
@@ -66,9 +66,10 @@ async fn handle_exit_status<'a>(
     stream_name: String,
     exit_status: ExitStatus,
     exit_handler_event_handler_sender: &'a Sender<(String, String)>,
+    restart_signal_sender: &'a Sender<u8>,
     api_url: &'a String,
-    user_access_token: &'a Arc<Mutex<String>>,
-    client_id: &'a Arc<Mutex<String>>,
+    user_access_token: &'a Arc<Option<UserToken>>,
+    client_id: &'a str,
 ) {
     if !exit_status.success() {
         let mut wait_time = Duration::from_secs(1);
@@ -78,8 +79,8 @@ async fn handle_exit_status<'a>(
             let request = reqwest::Client::new()
                 .get(api_url)
                 .query(&[("query", &stream_name)])
-                .bearer_auth(user_access_token.lock().await)
-                .header("Client-Id", &*client_id.lock().await)
+                .bearer_auth((**user_access_token).clone().unwrap().access_token.as_str())
+                .header("Client-Id", client_id)
                 .send()
                 .await;
 
@@ -106,11 +107,7 @@ async fn handle_exit_status<'a>(
                             return;
                         }
                     } else if response.status() == 401 {
-                        user_access_token.lock().await.clear();
-                        while user_access_token.lock().await.is_empty() {
-                            yield_now().await;
-                        }
-                        return;
+                        restart_signal_sender.send(1).await.unwrap();
                     } else {
                         eprintln!("Unexpected response:{}", response.text().await.unwrap());
                         return;
@@ -138,17 +135,18 @@ async fn handle_exit_status<'a>(
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::Arc, time::Duration};
+    use std::{str::FromStr, sync::Arc, time::Duration};
 
     use super::*;
     use tokio::{
         process::Command,
-        sync::{mpsc, Mutex},
+        sync::mpsc,
         task,
-        time::sleep,
+        time::{sleep, timeout},
     };
+    use twitch_oauth2::AccessToken;
 
-    async fn create_key(port: u16) -> (String, String) {
+    async fn create_key(port: u16) -> (Option<UserToken>, String) {
         let clients = reqwest::Client::new()
             .get(format!("http://localhost:{}/units/clients", port))
             .send()
@@ -193,6 +191,16 @@ mod tests {
         let refresh = auth.find("refresh").unwrap() - 3;
 
         let user_access_token: String = auth.chars().skip(token).take(refresh - token).collect();
+        let user_access_token = Some(UserToken::from_existing_unchecked(
+            AccessToken::from_str(&user_access_token).unwrap(),
+            None,
+            client_id.clone(),
+            None,
+            "".into(),
+            "".into(),
+            Some(vec![]),
+            Some(Duration::from_secs(10000)),
+        ));
 
         (user_access_token, client_id)
     }
@@ -214,7 +222,10 @@ mod tests {
         drop(event_sender);
         task_spawner(event_reciever, exit_sender, Player::Mpv, FILE.to_string()).await;
 
-        let (result_name, result_status) = exit_reciever.recv().await.unwrap();
+        let (result_name, result_status) = timeout(Duration::from_secs(15), exit_reciever.recv())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(fake_streamer_name, result_name);
         assert_eq!(exit_status.unwrap(), result_status.unwrap());
     }
@@ -225,6 +236,7 @@ mod tests {
         let api_url = format!("http://localhost:{}/mock/search/channels", PORT);
         let (process_sender, process_reciever) = mpsc::channel(10);
         let (exit_sender, exit_reciever) = mpsc::channel(10);
+        let (restart_signal_sender, _) = mpsc::channel(1);
 
         let mut child = Command::new("twitch-cli")
             .args(["mock-api", "start", "-p", &PORT.to_string()])
@@ -235,14 +247,14 @@ mod tests {
         task::spawn(async {
             sleep(Duration::from_secs(2)).await;
             let (user_access_token, client_id) = create_key(PORT).await;
-            let user_access_token = Arc::new(Mutex::new(user_access_token));
-            let client_id = Arc::new(Mutex::new(client_id));
+            let user_access_token = Arc::new(user_access_token);
             exit_handler(
                 process_reciever,
                 exit_sender,
+                restart_signal_sender,
                 api_url,
                 user_access_token,
-                client_id,
+                &client_id,
             )
             .await;
         });
@@ -266,6 +278,7 @@ mod tests {
         let api_url = format!("http://localhost:{}/mock/search/channels", PORT);
         let (process_sender, process_reciever) = mpsc::channel(10);
         let (exit_sender, mut exit_reciever) = mpsc::channel(10);
+        let (restart_signal_sender, _) = mpsc::channel(1);
 
         let mut child = Command::new("twitch-cli")
             .args(["mock-api", "start", "-p", &PORT.to_string()])
@@ -276,14 +289,14 @@ mod tests {
         task::spawn(async {
             sleep(Duration::from_secs(2)).await;
             let (user_access_token, client_id) = create_key(PORT).await;
-            let user_access_token = Arc::new(Mutex::new(user_access_token));
-            let client_id = Arc::new(Mutex::new(client_id));
+            let user_access_token = Arc::new(user_access_token);
             exit_handler(
                 process_reciever,
                 exit_sender,
+                restart_signal_sender,
                 api_url,
                 user_access_token,
-                client_id,
+                &client_id,
             )
             .await;
         });
@@ -297,7 +310,9 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            exit_reciever.recv().await,
+            timeout(Duration::from_secs(15), exit_reciever.recv())
+                .await
+                .unwrap(),
             Some((String::from("retry"), String::from("FisherMarston19")))
         );
         child.kill().await.unwrap();
@@ -310,6 +325,7 @@ mod tests {
         let api_url = format!("http://localhost:{}/mock/search/channels", PORT);
         let (process_sender, process_reciever) = mpsc::channel(10);
         let (exit_sender, exit_reciever) = mpsc::channel(10);
+        let (restart_signal_sender, _) = mpsc::channel(1);
 
         let mut child = Command::new("twitch-cli")
             .args(["mock-api", "start", "-p", &PORT.to_string()])
@@ -320,14 +336,14 @@ mod tests {
         task::spawn(async {
             sleep(Duration::from_secs(2)).await;
             let (user_access_token, client_id) = create_key(PORT).await;
-            let user_access_token = Arc::new(Mutex::new(user_access_token));
-            let client_id = Arc::new(Mutex::new(client_id));
+            let user_access_token = Arc::new(user_access_token);
             exit_handler(
                 process_reciever,
                 exit_sender,
+                restart_signal_sender,
                 api_url,
                 user_access_token,
-                client_id,
+                &client_id,
             )
             .await;
         });
@@ -351,6 +367,7 @@ mod tests {
         let api_url = format!("http://localhost:{}/mock/search/channels", PORT);
         let (process_sender, process_reciever) = mpsc::channel(10);
         let (exit_sender, exit_reciever) = mpsc::channel(10);
+        let (restart_signal_sender, _) = mpsc::channel(1);
 
         let mut child = Command::new("twitch-cli")
             .args(["mock-api", "start", "-p", &PORT.to_string()])
@@ -358,9 +375,12 @@ mod tests {
             .spawn()
             .unwrap();
 
+        // FIX the next part can happen before the server is fully up,
+        // causing the test to fail.
+        sleep(Duration::from_secs(3)).await;
+
         let (user_access_token, client_id) = create_key(PORT).await;
-        let user_access_token = Arc::new(Mutex::new(user_access_token));
-        let client_id = Arc::new(Mutex::new(client_id));
+        let user_access_token = Arc::new(user_access_token);
 
         child.kill().await.unwrap();
         child.wait().await.unwrap();
@@ -378,9 +398,10 @@ mod tests {
             exit_handler(
                 process_reciever,
                 exit_sender,
+                restart_signal_sender,
                 api_url,
                 user_access_token,
-                client_id,
+                &client_id,
             ),
         )
         .await
