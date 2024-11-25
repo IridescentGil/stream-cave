@@ -80,7 +80,13 @@ pub async fn run(settings: &Arc<Mutex<Settings>>, streams: &Arc<Mutex<Streams>>)
 
         let mut token: Option<twitch_oauth2::tokens::UserToken> = None;
         loop {
-            match authentication::create_auth_token(CLIENT_ID, &mut token).await {
+            match authentication::create_auth_token(
+                CLIENT_ID,
+                &mut token,
+                &settings_path.lock().await.schedule,
+            )
+            .await
+            {
                 Ok(_) => break,
                 Err(error) => println!("Error {}.\nPlease retry creating a token.", error),
             };

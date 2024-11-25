@@ -79,7 +79,13 @@ async fn handle_exit_status<'a>(
             let request = reqwest::Client::new()
                 .get(api_url)
                 .query(&[("query", &stream_name)])
-                .bearer_auth((**user_access_token).clone().unwrap().access_token.as_str())
+                .bearer_auth(
+                    (**user_access_token)
+                        .as_ref()
+                        .unwrap()
+                        .access_token
+                        .as_str(),
+                )
                 .header("Client-Id", client_id)
                 .send()
                 .await;

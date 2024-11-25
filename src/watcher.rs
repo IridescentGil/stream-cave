@@ -6,7 +6,11 @@ pub mod tasks_handler;
 pub mod twitch_socket;
 
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{
+    fs::read_to_string,
+    path::{Path, PathBuf},
+};
+use twitch_oauth2::UserToken;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub enum Player {
@@ -70,4 +74,30 @@ pub struct StreamConfig {
     pub quality_overides: Vec<(String, u16)>,
     pub streams_to_close_on: Vec<String>,
     pub streams_to_open_on: Vec<String>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct UserData {
+    pub access_token: String,
+    pub login: String,
+    pub user_id: String,
+}
+
+impl UserData {
+    fn from_file(path: &Path) -> Result<Self, Box<dyn std::error::Error>> {
+        let file = read_to_string(path)?;
+        Ok(serde_json::from_str(&file)?)
+    }
+    fn from_token(token: &UserToken) -> Self {
+        Self {
+            access_token: token.access_token.secret().to_string(),
+            login: token.login.to_string(),
+            user_id: token.user_id.to_string(),
+        }
+    }
+    fn save(&self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        let token_string = serde_json::to_string(self)?;
+        std::fs::write(path, token_string)?;
+        Ok(())
+    }
 }

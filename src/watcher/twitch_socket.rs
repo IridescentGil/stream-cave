@@ -307,7 +307,13 @@ async fn subscribe_to_event(
     loop {
         let subscriber = reqwest::Client::new()
             .post(api_url)
-            .bearer_auth((**user_access_token).clone().unwrap().access_token.as_str())
+            .bearer_auth(
+                (**user_access_token)
+                    .as_ref()
+                    .unwrap()
+                    .access_token
+                    .as_str(),
+            )
             .header("Client-Id", client_id)
             .json(&subscription)
             .send()
