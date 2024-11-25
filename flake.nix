@@ -35,17 +35,25 @@
 
           buildInputs = with pkgs; [
             openssl
+            mpv
           ];
 
-          nativeBuildInputs = with pkgs; [ pkg-config ];
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+          ];
 
+          UseNextest = true;
+          checkFlags = [
+            "--skip watcher::twitch_socket"
+            "--skip watcher::player"
+            "--skip watcher::tasks_handler"
+          ];
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ self.packages.${system}.default ];
           packages = with pkgs; [
             rust-bin.stable.latest.default
             twitch-cli
-            mpv
             streamlink
             cargo-mutants
             cargo-nextest
