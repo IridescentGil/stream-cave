@@ -14,7 +14,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_tungstenite::{
-    connect_async,
+    connect_async_tls_with_config,
     tungstenite::{http::Response, Error, Message},
     MaybeTlsStream, WebSocketStream,
 };
@@ -75,13 +75,16 @@ async fn parse_stream_message(
     twitch_websocket_event_handler_sender: Sender<(String, String)>,
     restart_signal_sender: &Sender<u8>,
 ) {
-    let (mut ws_stream, _) = match connect_async(websocket_url).await {
-        Ok(conect) => conect,
-        Err(error) => {
-            eprintln!("Error: {}, reconnecting", error);
-            reconnect_websocket(websocket_url).await
-        }
-    };
+    let connector =
+        tokio_tungstenite::Connector::NativeTls(native_tls::TlsConnector::new().unwrap());
+    let (mut ws_stream, _) =
+        match connect_async_tls_with_config(websocket_url, None, false, Some(connector)).await {
+            Ok(conect) => conect,
+            Err(error) => {
+                eprintln!("Error: {}, reconnecting", error);
+                reconnect_websocket(websocket_url).await
+            }
+        };
 
     loop {
         match tokio::time::timeout(Duration::from_secs(15), ws_stream.next())
@@ -184,9 +187,16 @@ async fn parse_connection_reply_message<'a>(
                 return;
             };
 
-            let (new_stream, _) = connect_async(&reconnect.session.reconnect_url.unwrap())
-                .await
-                .unwrap();
+            let connector =
+                tokio_tungstenite::Connector::NativeTls(native_tls::TlsConnector::new().unwrap());
+            let (new_stream, _) = connect_async_tls_with_config(
+                &reconnect.session.reconnect_url.unwrap(),
+                None,
+                false,
+                Some(connector),
+            )
+            .await
+            .unwrap();
 
             *ws_stream = new_stream;
             println!("Changed connection due to reconnect request");
@@ -270,11 +280,16 @@ async fn reconnect_websocket(
     WebSocketStream<MaybeTlsStream<TcpStream>>,
     Response<Option<Vec<u8>>>,
 ) {
+    let connector =
+        tokio_tungstenite::Connector::NativeTls(native_tls::TlsConnector::new().unwrap());
     const MAX_WAIT: Duration = Duration::new(180, 0);
     let mut time = Duration::new(1, 0);
-    let mut new_stream = connect_async(websocket_url).await;
+    let mut new_stream =
+        connect_async_tls_with_config(websocket_url, None, false, Some(connector)).await;
 
     while new_stream.is_err() {
+        let connector =
+            tokio_tungstenite::Connector::NativeTls(native_tls::TlsConnector::new().unwrap());
         time = match time.cmp(&MAX_WAIT) {
             std::cmp::Ordering::Less => time * 2,
             std::cmp::Ordering::Greater => MAX_WAIT,
@@ -285,7 +300,8 @@ async fn reconnect_websocket(
             time.as_secs()
         );
         sleep(time).await;
-        new_stream = connect_async(websocket_url).await;
+        new_stream =
+            connect_async_tls_with_config(websocket_url, None, false, Some(connector)).await;
     }
     println!("reconnected successfully");
 

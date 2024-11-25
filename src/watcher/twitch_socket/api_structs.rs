@@ -102,7 +102,7 @@ pub enum SubscriptionStatus {
     VersionRemoved,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Condition {
     pub broadcaster_user_id: String,
 }
@@ -139,7 +139,7 @@ pub struct SubscriptionBody {
     #[serde(rename = "type")]
     subscritpion_type: String,
     version: String,
-    condition: ConditionSubscriptionBody,
+    condition: Condition,
     transport: Transport,
 }
 
@@ -148,8 +148,8 @@ impl SubscriptionBody {
         SubscriptionBody {
             subscritpion_type: String::from("stream.online"),
             version: String::from("1"),
-            condition: ConditionSubscriptionBody {
-                user_id: id.to_string(),
+            condition: Condition {
+                broadcaster_user_id: id.to_string(),
             },
             transport: Transport {
                 method: String::from("websocket"),
@@ -157,11 +157,6 @@ impl SubscriptionBody {
             },
         }
     }
-}
-
-#[derive(Serialize, Debug)]
-pub struct ConditionSubscriptionBody {
-    pub user_id: String,
 }
 
 #[derive(Deserialize, Debug)]

@@ -60,9 +60,9 @@ pub fn read_streams(path: &Path) -> Streams {
 }
 pub async fn run(settings: &Arc<Mutex<Settings>>, streams: &Arc<Mutex<Streams>>) {
     #[cfg(debug_assertions)]
-    const TWITCH_WEBSOCKET_URL: &str = "ws://127.0.0.1:8080/ws";
+    const TWITCH_WEBSOCKET_URL: &str = "wss://127.0.0.1:8080/ws";
     #[cfg(debug_assertions)]
-    const TWITCH_API_URL: &str = "http://localhost:8080/eventsub/subscriptions";
+    const TWITCH_API_URL: &str = "https://localhost:8080/eventsub/subscriptions";
 
     #[cfg(not(debug_assertions))]
     const TWITCH_WEBSOCKET_URL: &str = "wss://eventsub.wss.twitch.tv/ws";
