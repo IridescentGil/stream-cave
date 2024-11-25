@@ -1,5 +1,4 @@
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tokio::task::yield_now;
 use tokio::{
     sync::mpsc::{Receiver, Sender},
@@ -27,7 +26,7 @@ pub async fn event_handler(
 
     task::spawn(async move {
         while let Some(config) = event_handler_file_watcher_reciever.recv().await {
-            file_configs.lock().await.push(config);
+            file_configs.lock().as_mut().unwrap().push(config);
         }
     });
 
@@ -59,13 +58,16 @@ async fn handle_event(
     yield_now().await;
     let found_configurations = configs
         .lock()
-        .await
+        .as_ref()
+        .unwrap()
         .iter()
         .filter(|streamer| streamer.name == stream.1)
         .count();
     if found_configurations == 1 {
-        let streamer_configs = configs.lock().await;
+        let streamer_configs = configs.lock();
         let config = streamer_configs
+            .as_ref()
+            .unwrap()
             .iter()
             .find(|streamer| streamer.name == stream.1)
             .unwrap();

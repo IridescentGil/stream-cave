@@ -1,15 +1,16 @@
 pub mod api_structs;
 
-use std::{sync::Arc, time::Duration};
+use std::{
+    ops::Deref,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use twitch_oauth2::UserToken;
 
 use futures_util::StreamExt;
 use tokio::{
     net::TcpStream,
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        Mutex,
-    },
+    sync::mpsc::{self, Receiver, Sender},
     task::{self, yield_now},
     time::sleep,
 };
@@ -52,7 +53,7 @@ pub async fn twitch_websocket<'a: 'static>(
         }
         first_name_signal_sender.send(()).await.unwrap();
 
-        while session_id_clone.lock().await.is_empty() {
+        while session_id_clone.lock().as_ref().unwrap().is_empty() {
             yield_now().await;
         }
         while let Some(id) = twitch_socket_file_watcher_reciever.recv().await {
@@ -61,7 +62,7 @@ pub async fn twitch_websocket<'a: 'static>(
                 twitch_api_url,
                 &twitch_user_access_token,
                 id,
-                session_id_clone.lock().await.clone(),
+                &session_id_clone,
                 client_id,
             )
             .await;
@@ -102,8 +103,9 @@ async fn parse_stream_message(
                 .await;
             }
             None => {
-                eprintln!("Connection closed");
-                restart_signal_sender.send(1).await.unwrap();
+                if restart_signal_sender.send(1).await.is_err() {
+                    yield_now().await;
+                }
             }
         }
     }
@@ -136,7 +138,9 @@ async fn parse_twitch_webocket_messages<'a>(
         }
         Err(error) => {
             eprintln!("Error: {}\n reconnecting", error);
-            restart_signal_sender.send(1).await.unwrap();
+            if restart_signal_sender.send(1).await.is_err() {
+                yield_now().await;
+            }
         }
     }
 }
@@ -178,7 +182,7 @@ async fn parse_connection_reply_message<'a>(
                 return;
             };
 
-            *websocket_session_id.lock().await = welcome.session.id;
+            **websocket_session_id.lock().as_mut().unwrap() = welcome.session.id;
             println!("successfully started websocket");
         }
         api_structs::MessageType::SessionReconnect => {
@@ -249,7 +253,9 @@ async fn parse_connection_notification_message(
                 eprintln!(
                     "No user acess token or token has expired, please create new user access token"
                 );
-                restart_signal_sender.send(1).await.unwrap();
+                if restart_signal_sender.send(1).await.is_err() {
+                    yield_now().await;
+                }
             } else if subscription.subscription.status
                 == api_structs::SubscriptionStatus::UserRemoved
             {
@@ -313,11 +319,12 @@ async fn subscribe_to_event(
     api_url: &str,
     user_access_token: &Arc<Option<UserToken>>,
     id: u32,
-    session_id: String,
+    session_id: &Arc<Mutex<String>>,
     client_id: &str,
 ) {
     const MAX_WAIT: Duration = Duration::new(180, 0);
     let time = Duration::new(1, 0);
+    let session_id = session_id.lock().as_ref().unwrap().to_string();
     let subscription = api_structs::SubscriptionBody::new_live_sub(id, session_id);
 
     loop {
@@ -337,7 +344,9 @@ async fn subscribe_to_event(
         match subscriber {
             Ok(response) => {
                 if response.status() == 401 {
-                    restart_signal_sender.send(1).await.unwrap();
+                    if restart_signal_sender.send(1).await.is_err() {
+                        yield_now().await;
+                    }
                 } else if response.status() != 202 {
                     println!(
                         "Error {}: \n{}",

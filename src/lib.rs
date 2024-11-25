@@ -2,12 +2,9 @@ mod watcher;
 use crate::watcher::*;
 use std::{
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
-use tokio::{
-    sync::{mpsc, Mutex},
-    task,
-};
+use tokio::{sync::mpsc, task};
 
 pub fn read_config(_flags: Vec<String>, paths: Vec<PathBuf>) -> Settings {
     let mut local_path = paths.last().unwrap_or(&PathBuf::new()).clone();
@@ -58,11 +55,11 @@ pub fn read_streams(path: &Path) -> Streams {
         }
     }
 }
-pub async fn run(settings: &Arc<Mutex<Settings>>, streams: &Arc<Mutex<Streams>>) {
+pub async fn run(settings: &Arc<Settings>, streams: &Arc<Mutex<Streams>>) {
     #[cfg(debug_assertions)]
-    const TWITCH_WEBSOCKET_URL: &str = "wss://127.0.0.1:8080/ws";
+    const TWITCH_WEBSOCKET_URL: &str = "ws://127.0.0.1:8080/ws";
     #[cfg(debug_assertions)]
-    const TWITCH_API_URL: &str = "https://localhost:8080/eventsub/subscriptions";
+    const TWITCH_API_URL: &str = "http://localhost:8080/eventsub/subscriptions";
 
     #[cfg(not(debug_assertions))]
     const TWITCH_WEBSOCKET_URL: &str = "wss://eventsub.wss.twitch.tv/ws";
@@ -75,20 +72,16 @@ pub async fn run(settings: &Arc<Mutex<Settings>>, streams: &Arc<Mutex<Streams>>)
 
     loop {
         let streams = streams.clone();
-        let settings_player = settings.clone();
         let settings_path = settings.clone();
+        let settings_player = settings.clone();
 
         let mut token: Option<twitch_oauth2::tokens::UserToken> = None;
         loop {
-            match authentication::create_auth_token(
-                CLIENT_ID,
-                &mut token,
-                &settings_path.lock().await.schedule,
-            )
-            .await
+            match authentication::create_auth_token(CLIENT_ID, &mut token, &settings_path.schedule)
+                .await
             {
                 Ok(_) => break,
-                Err(error) => println!("Error {}.\nPlease retry creating a token.", error),
+                Err(error) => println!("Error {:?}.\nPlease retry creating a token.", error),
             };
         }
 
@@ -112,17 +105,19 @@ pub async fn run(settings: &Arc<Mutex<Settings>>, streams: &Arc<Mutex<Streams>>)
         let restart_signal_sender_exit_handler = restart_signal_sender.clone();
         let restart_signal_sender_twitch_socket = restart_signal_sender.clone();
 
-        let (first_task, second_task, third_task, fourth_task, fifth_task, sixth_task) = tokio::join!(
-            task::spawn(async move {
+        tokio::select! {
+           Err(error) = task::spawn(async move {
                 file_watcher::file_watcher(
                     file_watcher_twitch_websocket_sender,
                     file_watcher_event_handler_sender,
-                    &settings_path.lock().await.schedule,
+                    &settings_path.schedule,
                     &streams,
                 )
                 .await
-            }),
-            task::spawn(async move {
+            }) => {
+                eprintln!("Error encountered in task: {}", error);
+            }
+           Err(error) = task::spawn(async move {
                 twitch_socket::twitch_websocket(
                     twitch_socket_file_watcher_reciever,
                     twitch_websocket_event_handler_sender,
@@ -133,8 +128,10 @@ pub async fn run(settings: &Arc<Mutex<Settings>>, streams: &Arc<Mutex<Streams>>)
                     CLIENT_ID,
                 )
                 .await
-            }),
-            task::spawn(async move {
+            }) => {
+                eprintln!("Error encountered in task: {}", error);
+            }
+           Err(error) = task::spawn(async move {
                 event_handler::event_handler(
                     event_handler_twitch_websocket_reciever,
                     event_handler_exit_handler_reciever,
@@ -142,17 +139,21 @@ pub async fn run(settings: &Arc<Mutex<Settings>>, streams: &Arc<Mutex<Streams>>)
                     event_handler_task_spawner_sender,
                 )
                 .await
-            }),
-            task::spawn(async move {
+            }) => {
+                eprintln!("Error encountered in task: {}", error);
+            }
+           Err(error) = task::spawn(async move {
                 tasks_handler::task_spawner(
                     task_spawner_event_handler_reciever,
                     task_spawner_exit_handler_sender,
-                    settings_player.lock().await.player,
+                    settings_player.player,
                     STREAMING_SITE.to_string(),
                 )
                 .await
-            }),
-            task::spawn(async move {
+            }) => {
+                eprintln!("Error encountered in task: {}", error);
+            }
+           Err(error) = task::spawn(async move {
                 tasks_handler::exit_handler(
                     exit_handler_task_spawner_reciever,
                     exit_handler_event_handler_sender,
@@ -162,29 +163,11 @@ pub async fn run(settings: &Arc<Mutex<Settings>>, streams: &Arc<Mutex<Streams>>)
                     CLIENT_ID,
                 )
                 .await
-            }),
-            restart_signal_reciever.recv()
-        );
-
-        if let Err(error) = first_task {
-            eprintln!("Error encountered in task: {}", error);
-        }
-        if let Err(error) = second_task {
-            eprintln!("Error encountered in task: {}", error);
-        }
-        if let Err(error) = third_task {
-            eprintln!("Error encountered in task: {}", error);
-        }
-        if let Err(error) = fourth_task {
-            eprintln!("Error encountered in task: {}", error);
-        }
-        if let Err(error) = fifth_task {
-            eprintln!("Error encountered in task: {}", error);
-        }
-        if let Some(code) = sixth_task {
-            if code == 1 {
-                continue;
+            }) => {
+                eprintln!("Error encountered in task: {}", error);
             }
-        }
+            _ = restart_signal_reciever.recv() => {
+            }
+        };
     }
 }

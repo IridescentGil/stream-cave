@@ -3,3 +3,4 @@
 .envrc
 mutants.*
 result
+/*.json

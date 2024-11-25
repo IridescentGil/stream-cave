@@ -1,6 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 
-use tokio::sync::Mutex;
+use std::sync::Mutex;
 
 #[tokio::main]
 async fn main() {
@@ -13,9 +13,7 @@ async fn main() {
         paths.push(dirs.config_dir().to_owned());
     }
 
-    let settings = Arc::new(Mutex::new(stream_watcher::read_config(flags, paths)));
-    let streams = Arc::new(Mutex::new(stream_watcher::read_streams(
-        &settings.lock().await.schedule,
-    )));
+    let settings = Arc::new(stream_watcher::read_config(flags, paths));
+    let streams = Arc::new(Mutex::new(stream_watcher::read_streams(&settings.schedule)));
     stream_watcher::run(&settings, &streams).await;
 }

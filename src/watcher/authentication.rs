@@ -4,7 +4,7 @@ use std::path::Path;
 
 use twitch_oauth2::{
     tokens::{errors::ValidationError, UserToken},
-    url, ImplicitUserTokenBuilder, TwitchToken,
+    url, ImplicitUserTokenBuilder,
 };
 
 pub async fn create_auth_token(
@@ -16,17 +16,7 @@ pub async fn create_auth_token(
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
 
-    if user_access_token.is_some() {
-        if user_access_token
-            .as_ref()
-            .unwrap()
-            .validate_token(&client)
-            .await
-            .is_ok()
-        {
-            return Ok(());
-        }
-    } else if path.join("user-data.json").exists() {
+    if path.join("user-data.json").exists() {
         let user_data = UserData::from_file(&path.join("user-data.json"))?;
         let token_result = UserToken::from_token(&client, user_data.access_token.into()).await;
         match token_result {
@@ -37,6 +27,7 @@ pub async fn create_auth_token(
             Err(error) => match error {
                 ValidationError::NotAuthorized => {}
                 ValidationError::Request(request_error) => {
+                    // FIXME: implement waiting on request errors
                     return Err(request_error.into());
                 }
                 ValidationError::InvalidToken(token_error) => {
