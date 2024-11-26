@@ -113,7 +113,7 @@ async fn handle_exit_status<'a>(
                             return;
                         }
                     } else if response.status() == 401 {
-                        if restart_signal_sender.send(1).await.is_err() {
+                        if restart_signal_sender.send(2).await.is_err() {
                             task::yield_now().await;
                         }
                     } else {

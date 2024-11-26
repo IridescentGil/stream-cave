@@ -14,13 +14,33 @@ pub async fn file_watcher(
     _streams_path: &Path,
     streams: &Arc<Mutex<Streams>>,
 ) {
-    let streamers = streams.lock().as_ref().unwrap().names.clone();
+    let streamers = streams
+        .lock()
+        .as_ref()
+        .expect("Mutex lock poisoned")
+        .names
+        .clone();
     let streamers = streamers.iter();
-    let quality_iter = streams.lock().as_ref().unwrap().quality_overides.clone();
+    let quality_iter = streams
+        .lock()
+        .as_ref()
+        .expect("Mutex lock poisoned")
+        .quality_overides
+        .clone();
     let mut quality_iter = quality_iter.iter();
-    let open_on_iter = streams.lock().as_ref().unwrap().streams_to_open_on.clone();
+    let open_on_iter = streams
+        .lock()
+        .as_ref()
+        .expect("Mutex lock poisoned")
+        .streams_to_open_on
+        .clone();
     let mut open_on_iter = open_on_iter.iter();
-    let close_on_iter = streams.lock().as_ref().unwrap().streams_to_close_on.clone();
+    let close_on_iter = streams
+        .lock()
+        .as_ref()
+        .expect("Mutex lock poisoned")
+        .streams_to_close_on
+        .clone();
     let mut close_on_iter = close_on_iter.iter();
     for streamer in streamers {
         file_watcher_twitch_websocket_sender

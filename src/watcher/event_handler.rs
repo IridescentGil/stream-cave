@@ -26,7 +26,11 @@ pub async fn event_handler(
 
     task::spawn(async move {
         while let Some(config) = event_handler_file_watcher_reciever.recv().await {
-            file_configs.lock().as_mut().unwrap().push(config);
+            file_configs
+                .lock()
+                .as_mut()
+                .expect("Mutex lock poisoned")
+                .push(config);
         }
     });
 
@@ -59,7 +63,7 @@ async fn handle_event(
     let found_configurations = configs
         .lock()
         .as_ref()
-        .unwrap()
+        .expect("Mutex lock poisoned")
         .iter()
         .filter(|streamer| streamer.name == stream.1)
         .count();
@@ -67,7 +71,7 @@ async fn handle_event(
         let streamer_configs = configs.lock();
         let config = streamer_configs
             .as_ref()
-            .unwrap()
+            .expect("Mutex lock poisoned")
             .iter()
             .find(|streamer| streamer.name == stream.1)
             .unwrap();

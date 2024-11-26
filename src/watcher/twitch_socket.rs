@@ -1,7 +1,6 @@
 pub mod api_structs;
 
 use std::{
-    ops::Deref,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -53,7 +52,12 @@ pub async fn twitch_websocket<'a: 'static>(
         }
         first_name_signal_sender.send(()).await.unwrap();
 
-        while session_id_clone.lock().as_ref().unwrap().is_empty() {
+        while session_id_clone
+            .lock()
+            .as_ref()
+            .expect("Mutex lock poisoned")
+            .is_empty()
+        {
             yield_now().await;
         }
         while let Some(id) = twitch_socket_file_watcher_reciever.recv().await {
@@ -88,7 +92,7 @@ async fn parse_stream_message(
         };
 
     loop {
-        match tokio::time::timeout(Duration::from_secs(15), ws_stream.next())
+        match tokio::time::timeout(Duration::from_secs(30), ws_stream.next())
             .await
             .unwrap_or(None)
         {
@@ -182,7 +186,10 @@ async fn parse_connection_reply_message<'a>(
                 return;
             };
 
-            **websocket_session_id.lock().as_mut().unwrap() = welcome.session.id;
+            **websocket_session_id
+                .lock()
+                .as_mut()
+                .expect("Mutex lock poisoned") = welcome.session.id;
             println!("successfully started websocket");
         }
         api_structs::MessageType::SessionReconnect => {
@@ -253,7 +260,7 @@ async fn parse_connection_notification_message(
                 eprintln!(
                     "No user acess token or token has expired, please create new user access token"
                 );
-                if restart_signal_sender.send(1).await.is_err() {
+                if restart_signal_sender.send(2).await.is_err() {
                     yield_now().await;
                 }
             } else if subscription.subscription.status
@@ -324,7 +331,11 @@ async fn subscribe_to_event(
 ) {
     const MAX_WAIT: Duration = Duration::new(180, 0);
     let time = Duration::new(1, 0);
-    let session_id = session_id.lock().as_ref().unwrap().to_string();
+    let session_id = session_id
+        .lock()
+        .as_ref()
+        .expect("Mutex lock poisoned")
+        .to_string();
     let subscription = api_structs::SubscriptionBody::new_live_sub(id, session_id);
 
     loop {
@@ -344,7 +355,7 @@ async fn subscribe_to_event(
         match subscriber {
             Ok(response) => {
                 if response.status() == 401 {
-                    if restart_signal_sender.send(1).await.is_err() {
+                    if restart_signal_sender.send(2).await.is_err() {
                         yield_now().await;
                     }
                 } else if response.status() != 202 {
