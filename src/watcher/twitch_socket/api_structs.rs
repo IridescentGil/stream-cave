@@ -173,7 +173,7 @@ pub struct Pagination {
 #[derive(Deserialize, Debug)]
 pub struct SearchData {
     broadcaster_language: String,
-    broadcaster_login: String,
+    pub broadcaster_login: String,
     pub display_name: String,
     game_id: String,
     game_name: String,

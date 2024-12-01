@@ -78,7 +78,7 @@ async fn handle_event(
         let global_quality_overrides = &config.quality_overides;
         if let Some(current_profile_override) = global_quality_overrides
             .iter()
-            .find(|(profile, _)| profile == global_profile.0)
+            .find(|(profile, _)| *profile == global_profile.0)
         {
             stream_quality = current_profile_override.1;
         }

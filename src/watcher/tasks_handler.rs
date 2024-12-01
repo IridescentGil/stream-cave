@@ -102,7 +102,7 @@ async fn handle_exit_status<'a>(
                         let is_live = json_data
                             .data
                             .iter()
-                            .find(|data_set| data_set.display_name == stream_name)
+                            .find(|data_set| data_set.broadcaster_login == stream_name)
                             .unwrap()
                             .is_live;
                         if is_live {

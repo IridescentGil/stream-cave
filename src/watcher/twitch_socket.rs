@@ -239,7 +239,7 @@ async fn parse_connection_notification_message(
             if subscription.subscription.subscritpion_type == "stream.online"
                 && subscription.event.event_type == api_structs::EventType::Live
             {
-                let stream_name = subscription.event.broadcaster_user_name;
+                let stream_name = subscription.event.broadcaster_user_login;
                 twitch_websocket_event_handler_sender
                     .send((String::from("live"), stream_name))
                     .await
