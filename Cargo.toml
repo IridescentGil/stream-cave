@@ -15,3 +15,18 @@ directories = "5"
 twitch_oauth2 = { version = "0.14", features = [ "reqwest", "mock_api" ] }
 rpassword = "7.3.1"
 percent-encoding = "2.3.1"
+clap = { version = "4.5.21", features = ["derive"] }
+clap_derive = "=4.5.18"
+
+[lints.clippy]
+unwrap_used = "warn"
+# pedantic = "warn"
+# nursery = "warn"
+
+[[bin]]
+name = "stream-watcher"
+path = "src/bin/stream-watcher.rs"
+
+[[bin]]
+name = "stream-watcherd"
+path = "src/bin/stream-watcherd.rs"

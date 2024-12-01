@@ -1,5 +1,8 @@
 mod watcher;
 pub use crate::watcher::authentication::create_oauth_token;
+pub use crate::watcher::player::get_stream;
+pub use crate::watcher::Player;
+
 use crate::watcher::*;
 use std::{
     path::{Path, PathBuf},
@@ -8,7 +11,7 @@ use std::{
 };
 use tokio::{sync::mpsc, task};
 
-pub fn read_config(_flags: Vec<String>, paths: Vec<PathBuf>) -> Settings {
+pub fn read_config(paths: Vec<PathBuf>) -> Settings {
     let mut local_path = paths.last().unwrap_or(&PathBuf::new()).clone();
 
     for path in paths {
