@@ -269,7 +269,7 @@ mod tests {
 
         process_sender
             .send((
-                String::from("FisherMarston19"),
+                String::from("fishermarston19"),
                 Command::new("ls").status().await,
             ))
             .await
@@ -311,7 +311,7 @@ mod tests {
 
         process_sender
             .send((
-                String::from("FisherMarston19"),
+                String::from("fishermarston19"),
                 Command::new("ls").arg("nonexistent").status().await,
             ))
             .await
@@ -321,7 +321,7 @@ mod tests {
             timeout(Duration::from_secs(15), exit_reciever.recv())
                 .await
                 .unwrap(),
-            Some((String::from("retry"), String::from("FisherMarston19")))
+            Some((String::from("retry"), String::from("fishermarston19")))
         );
         child.kill().await.unwrap();
         child.wait().await.unwrap();
@@ -358,7 +358,7 @@ mod tests {
 
         process_sender
             .send((
-                String::from("GordonGordon358"),
+                String::from("gordongordon358"),
                 Command::new("ls").arg("nonexistent").status().await,
             ))
             .await
@@ -395,7 +395,7 @@ mod tests {
 
         process_sender
             .send((
-                String::from("FisherMarston19"),
+                String::from("fishermarston19"),
                 Command::new("ls").arg("nonexistent").status().await,
             ))
             .await
