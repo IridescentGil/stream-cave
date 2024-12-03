@@ -122,76 +122,71 @@ pub async fn run(settings: &Arc<Settings>, streams: &Arc<Mutex<Streams>>) {
             let restart_signal_sender_exit_handler = restart_signal_sender.clone();
             let restart_signal_sender_twitch_socket = restart_signal_sender.clone();
 
-            tokio::select! {
-               Err(error) = task::spawn(async move {
-                    file_watcher::file_watcher(
-                        file_watcher_twitch_websocket_sender,
-                        file_watcher_event_handler_sender,
-                        &settings_path.schedule,
-                        &streams,
-                    )
-                    .await
-                }) => {
-                    eprintln!("Error encountered in task: {}", error);
-                }
-               Err(error) = task::spawn(async move {
-                    twitch_socket::twitch_websocket(
-                        twitch_socket_file_watcher_reciever,
-                        twitch_websocket_event_handler_sender,
-                        restart_signal_sender_twitch_socket,
-                        TWITCH_WEBSOCKET_URL,
-                        TWITCH_API_URL,
-                        user_access_token_websocket,
-                        CLIENT_ID,
-                    )
-                    .await
-                }) => {
-                    eprintln!("Error encountered in task: {}", error);
-                }
-               Err(error) = task::spawn(async move {
-                    event_handler::event_handler(
-                        event_handler_twitch_websocket_reciever,
-                        event_handler_exit_handler_reciever,
-                        event_handler_file_watcher_reciever,
-                        event_handler_task_spawner_sender,
-                    )
-                    .await
-                }) => {
-                    eprintln!("Error encountered in task: {}", error);
-                }
-               Err(error) = task::spawn(async move {
-                    tasks_handler::task_spawner(
-                        task_spawner_event_handler_reciever,
-                        task_spawner_exit_handler_sender,
-                        settings_player.player,
-                        STREAMING_SITE.to_string(),
-                    )
-                    .await
-                }) => {
-                    eprintln!("Error encountered in task: {}", error);
-                }
-               Err(error) = task::spawn(async move {
-                    tasks_handler::exit_handler(
-                        exit_handler_task_spawner_reciever,
-                        exit_handler_event_handler_sender,
-                        restart_signal_sender_exit_handler,
-                        SEARCH_CHANNEL_API.to_string(),
-                        user_access_token_exit_handler,
-                        CLIENT_ID,
-                    )
-                    .await
-                }) => {
-                    eprintln!("Error encountered in task: {}", error);
-                }
-                Some(code) = restart_signal_reciever.recv() => {
-                    println!("Code restart code: {}", code);
-                    match code{
-                        1 => continue,
-                        2 => break,
-                        _ => println!("Unrecognized code"),
+            task::spawn(async move {
+                file_watcher::file_watcher(
+                    file_watcher_twitch_websocket_sender,
+                    file_watcher_event_handler_sender,
+                    &settings_path.schedule,
+                    &streams,
+                )
+                .await
+            });
+            task::spawn(async move {
+                twitch_socket::twitch_websocket(
+                    twitch_socket_file_watcher_reciever,
+                    twitch_websocket_event_handler_sender,
+                    restart_signal_sender_twitch_socket,
+                    TWITCH_WEBSOCKET_URL,
+                    TWITCH_API_URL,
+                    user_access_token_websocket,
+                    CLIENT_ID,
+                )
+                .await
+            });
+            task::spawn(async move {
+                event_handler::event_handler(
+                    event_handler_twitch_websocket_reciever,
+                    event_handler_exit_handler_reciever,
+                    event_handler_file_watcher_reciever,
+                    event_handler_task_spawner_sender,
+                )
+                .await
+            });
+            task::spawn(async move {
+                tasks_handler::task_spawner(
+                    task_spawner_event_handler_reciever,
+                    task_spawner_exit_handler_sender,
+                    settings_player.player,
+                    STREAMING_SITE.to_string(),
+                )
+                .await
+            });
+            task::spawn(async move {
+                tasks_handler::exit_handler(
+                    exit_handler_task_spawner_reciever,
+                    exit_handler_event_handler_sender,
+                    restart_signal_sender_exit_handler,
+                    SEARCH_CHANNEL_API.to_string(),
+                    user_access_token_exit_handler,
+                    CLIENT_ID,
+                )
+                .await
+            });
+
+            if let Some(code) = restart_signal_reciever.recv().await {
+                println!("Code restart code: {}", code);
+                match code {
+                    1 => {
+                        continue;
                     }
+                    2 => {
+                        break;
+                    }
+                    _ => println!("Unrecognized code"),
                 }
-            };
+            } else {
+                return;
+            }
         }
     }
 }

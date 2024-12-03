@@ -58,7 +58,7 @@ pub async fn twitch_websocket<'a: 'static>(
             .expect("Mutex lock poisoned")
             .is_empty()
         {
-            yield_now().await;
+            sleep(Duration::from_secs(1)).await;
         }
         while let Some(id) = twitch_socket_file_watcher_reciever.recv().await {
             subscribe_to_event(
@@ -92,12 +92,12 @@ async fn parse_stream_message(
         };
 
     loop {
-        match tokio::time::timeout(Duration::from_secs(30), ws_stream.next())
+        match tokio::time::timeout(Duration::from_secs(15), ws_stream.next())
             .await
             .unwrap_or(None)
         {
             Some(connection) => {
-                parse_twitch_webocket_messages(
+                let result = parse_twitch_webocket_messages(
                     connection,
                     &mut ws_stream,
                     &websocket_session_id,
@@ -105,11 +105,14 @@ async fn parse_stream_message(
                     restart_signal_sender,
                 )
                 .await;
+                if result.is_err() {
+                    return;
+                }
             }
             None => {
-                if restart_signal_sender.send(1).await.is_err() {
-                    yield_now().await;
-                }
+                eprintln!("Signal timeout, attempting to reconnect");
+                let _ = restart_signal_sender.send(1).await;
+                return;
             }
         }
     }
@@ -121,7 +124,7 @@ async fn parse_twitch_webocket_messages<'a>(
     websocket_session_id: &'a Arc<Mutex<String>>,
     twitch_websocket_event_handler_sender: &'a Sender<(String, String)>,
     restart_signal_sender: &'a Sender<u8>,
-) {
+) -> Result<(), i8> {
     match connection {
         Ok(message) => {
             if !message.is_ping() && !message.is_pong() && !message.is_close() {
@@ -142,11 +145,11 @@ async fn parse_twitch_webocket_messages<'a>(
         }
         Err(error) => {
             eprintln!("Error: {}\n reconnecting", error);
-            if restart_signal_sender.send(1).await.is_err() {
-                yield_now().await;
-            }
+            let _ = restart_signal_sender.send(1).await;
+            return Err(-1);
         }
     }
+    return Ok(());
 }
 
 async fn parse_twitch_websocket_json<'a>(
@@ -260,9 +263,7 @@ async fn parse_connection_notification_message(
                 eprintln!(
                     "No user acess token or token has expired, please create new user access token"
                 );
-                if restart_signal_sender.send(2).await.is_err() {
-                    yield_now().await;
-                }
+                let _ = restart_signal_sender.send(2).await;
             } else if subscription.subscription.status
                 == api_structs::SubscriptionStatus::UserRemoved
             {
@@ -355,9 +356,8 @@ async fn subscribe_to_event(
         match subscriber {
             Ok(response) => {
                 if response.status() == 401 {
-                    if restart_signal_sender.send(2).await.is_err() {
-                        yield_now().await;
-                    }
+                    let _ = restart_signal_sender.send(2).await;
+                    break;
                 } else if response.status() != 202 {
                     println!(
                         "Error {}: \n{}",

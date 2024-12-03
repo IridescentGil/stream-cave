@@ -113,9 +113,8 @@ async fn handle_exit_status<'a>(
                             return;
                         }
                     } else if response.status() == 401 {
-                        if restart_signal_sender.send(2).await.is_err() {
-                            task::yield_now().await;
-                        }
+                        let _ = restart_signal_sender.send(2).await;
+                        return;
                     } else {
                         eprintln!("Unexpected response:{}", response.text().await.unwrap());
                         return;
