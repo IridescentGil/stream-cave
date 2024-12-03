@@ -1,5 +1,6 @@
 use clap::Parser;
 use std::{path::PathBuf, sync::Arc};
+use stream_watcher::{Settings, Streams};
 
 use std::sync::Mutex;
 
@@ -24,7 +25,7 @@ async fn main() {
         paths.push(dirs.config_dir().to_owned());
     }
 
-    let settings = Arc::new(stream_watcher::read_config(paths));
-    let streams = Arc::new(Mutex::new(stream_watcher::read_streams(&settings.schedule)));
+    let settings = Arc::new(Settings::read_config(&paths));
+    let streams = Arc::new(Mutex::new(Streams::read_streams(&settings.schedule)));
     stream_watcher::run(&settings, &streams).await;
 }

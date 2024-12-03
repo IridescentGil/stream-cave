@@ -27,18 +27,59 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn new(path: PathBuf) -> Self {
+    #[must_use]
+    pub fn new(path: &Path) -> Self {
         let ver = (0, 1);
         let player = Player::Mpv;
-        let schedule = path;
+        let schedule = path.to_path_buf();
         let profile = (String::from("normal"), 1080);
 
-        Settings {
+        Self {
             ver,
             player,
             schedule,
             profile,
         }
+    }
+
+    #[must_use]
+    pub fn read_config(paths: &[PathBuf]) -> Self {
+        for path in paths {
+            if path.as_path().join("config.json").exists() {
+                let config = std::fs::read_to_string(path.join("config.json"));
+                match config {
+                    Ok(settings) => match serde_json::from_str(&settings) {
+                        Ok(json) => return json,
+                        Err(error) => {
+                            eprintln!("Error deserializing data: {error}");
+                            return Self::new(path);
+                        }
+                    },
+                    Err(error) => {
+                        eprintln!("Error opening config file: {error}");
+                        return Self::new(path);
+                    }
+                }
+            }
+        }
+
+        let local_path = paths.last().map_or_else(|| Path::new(""), |path| path);
+
+        let new_settings = Self::new(local_path);
+        if let Ok(data) = serde_json::to_string(&new_settings) {
+            std::fs::create_dir(local_path).expect("Unable to create directory");
+
+            let local_path = local_path.join("config.json");
+
+            std::fs::write(&local_path, data).unwrap_or_else(|_| {
+                eprintln!(
+                    "Unable to write to file: {}",
+                    local_path.to_str().expect("Non UTF-8 String")
+                );
+            });
+        }
+
+        new_settings
     }
 }
 
@@ -51,12 +92,31 @@ pub struct Streams {
 }
 
 impl Streams {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             names: Vec::new(),
             quality_overides: Vec::new(),
             streams_to_close_on: Vec::new(),
             streams_to_open_on: Vec::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn read_streams(path: &Path) -> Self {
+        let file = std::fs::read_to_string(path.join("schedule.json"));
+        match file {
+            Ok(data) => match serde_json::from_str(&data) {
+                Ok(json) => json,
+                Err(error) => {
+                    eprintln!("Error deserializing data: {error}");
+                    Self::new()
+                }
+            },
+            Err(error) => {
+                eprint!("Error opening file: {error}");
+                Self::new()
+            }
         }
     }
 }
@@ -67,7 +127,7 @@ impl Default for Streams {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct StreamConfig {
     pub name: String,
     pub id: u32,
@@ -84,7 +144,7 @@ pub struct UserData {
 }
 
 impl UserData {
-    fn from_file(path: &Path) -> Result<Self, Box<dyn std::error::Error>> {
+    fn from_file(path: &Path) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let file = read_to_string(path)?;
         Ok(serde_json::from_str(&file)?)
     }

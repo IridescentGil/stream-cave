@@ -16,10 +16,8 @@ pub async fn event_handler(
     let streamer_configs = Arc::new(Mutex::new(Vec::new()));
     let file_configs = streamer_configs.clone();
     let socket_configs = streamer_configs.clone();
-    let exit_configs = streamer_configs.clone();
 
     let socket_sender = event_handler_task_spawner_sender.clone();
-    let exit_sender = event_handler_task_spawner_sender.clone();
 
     // FIXME: get global profile from settings
     let global_profile = ("normal", 1080);
@@ -44,8 +42,8 @@ pub async fn event_handler(
 
     task::spawn(async move {
         while let Some(stream) = event_handler_exit_handler_reciever.recv().await {
-            let sender_clone = exit_sender.clone();
-            let config_clone = exit_configs.clone();
+            let sender_clone = event_handler_task_spawner_sender.clone();
+            let config_clone = streamer_configs.clone();
             handle_event(config_clone, stream, sender_clone, &global_profile).await;
         }
     });
@@ -124,7 +122,7 @@ mod tests {
 
         let streamer = StreamConfig {
             name: String::from("kaicenat"),
-            id: 641972806,
+            id: 641_972_806,
             quality_overides: vec![(String::from("normal"), 480)],
             streams_to_close_on: Vec::new(),
             streams_to_open_on: Vec::new(),
@@ -156,7 +154,7 @@ mod tests {
 
         let streamer = StreamConfig {
             name: String::from("kaicenat"),
-            id: 641972806,
+            id: 641_972_806,
             quality_overides: vec![(String::from("normal"), 480)],
             streams_to_close_on: Vec::new(),
             streams_to_open_on: Vec::new(),
@@ -187,7 +185,7 @@ mod tests {
 
         let streamer = StreamConfig {
             name: String::from("kaicenat"),
-            id: 641972806,
+            id: 641_972_806,
             quality_overides: Vec::new(),
             streams_to_close_on: Vec::new(),
             streams_to_open_on: Vec::new(),

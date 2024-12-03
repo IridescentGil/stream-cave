@@ -17,7 +17,7 @@ pub async fn get_stream<'a, 'b>(
             } else {
                 mpv.arg(stream)
                     .arg("--no-resume-playback")
-                    .arg(format!("--ytdl-format=best[height<=?{}]", quality));
+                    .arg(format!("--ytdl-format=best[height<=?{quality}]"));
             }
             mpv.status()
         }
@@ -26,7 +26,7 @@ pub async fn get_stream<'a, 'b>(
             if quality == 0 {
                 streamlink.arg(stream).arg("audio_only");
             } else {
-                streamlink.arg(stream).arg(format!("{}p", quality));
+                streamlink.arg(stream).arg(format!("{quality}p"));
             }
             streamlink.status()
         }

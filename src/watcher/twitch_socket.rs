@@ -86,34 +86,31 @@ async fn parse_stream_message(
         match connect_async_tls_with_config(websocket_url, None, false, Some(connector)).await {
             Ok(conect) => conect,
             Err(error) => {
-                eprintln!("Error: {}, reconnecting", error);
+                eprintln!("Error: {error}, reconnecting");
                 reconnect_websocket(websocket_url).await
             }
         };
 
     loop {
-        match tokio::time::timeout(Duration::from_secs(15), ws_stream.next())
+        if let Some(connection) = tokio::time::timeout(Duration::from_secs(15), ws_stream.next())
             .await
             .unwrap_or(None)
         {
-            Some(connection) => {
-                let result = parse_twitch_webocket_messages(
-                    connection,
-                    &mut ws_stream,
-                    &websocket_session_id,
-                    &twitch_websocket_event_handler_sender,
-                    restart_signal_sender,
-                )
-                .await;
-                if result.is_err() {
-                    return;
-                }
-            }
-            None => {
-                eprintln!("Signal timeout, attempting to reconnect");
-                let _ = restart_signal_sender.send(1).await;
+            let result = parse_twitch_webocket_messages(
+                connection,
+                &mut ws_stream,
+                &websocket_session_id,
+                &twitch_websocket_event_handler_sender,
+                restart_signal_sender,
+            )
+            .await;
+            if result.is_err() {
                 return;
             }
+        } else {
+            eprintln!("Signal timeout, attempting to reconnect");
+            let _ = restart_signal_sender.send(1).await;
+            return;
         }
     }
 }
@@ -130,7 +127,7 @@ async fn parse_twitch_webocket_messages<'a>(
             if !message.is_ping() && !message.is_pong() && !message.is_close() {
                 let message = message.to_text().unwrap();
                 let parsed: api_structs::TwitchApi = serde_json::from_str(message)
-                    .unwrap_or_else(|_| panic!("Unable to parse json response: \n{}", message));
+                    .unwrap_or_else(|_| panic!("Unable to parse json response: \n{message}"));
 
                 parse_twitch_websocket_json(
                     parsed.metadata,
@@ -144,12 +141,12 @@ async fn parse_twitch_webocket_messages<'a>(
             }
         }
         Err(error) => {
-            eprintln!("Error: {}\n reconnecting", error);
+            eprintln!("Error: {error}\n reconnecting");
             let _ = restart_signal_sender.send(1).await;
             return Err(-1);
         }
     }
-    return Ok(());
+    Ok(())
 }
 
 async fn parse_twitch_websocket_json<'a>(
@@ -185,7 +182,7 @@ async fn parse_connection_reply_message<'a>(
     match reply.message_type {
         api_structs::MessageType::SessionWelcome => {
             let api_structs::WebsocketPayload::Connection(welcome) = payload else {
-                eprintln!("Error expecting welcome message, got:\n{:?}", payload);
+                eprintln!("Error expecting welcome message, got:\n{payload:?}");
                 return;
             };
 
@@ -197,7 +194,7 @@ async fn parse_connection_reply_message<'a>(
         }
         api_structs::MessageType::SessionReconnect => {
             let api_structs::WebsocketPayload::Connection(reconnect) = payload else {
-                eprintln!("Error expecting reconnect message, got:\n{:?}", payload);
+                eprintln!("Error expecting reconnect message, got:\n{payload:?}");
                 return;
             };
 
@@ -219,7 +216,7 @@ async fn parse_connection_reply_message<'a>(
             // Nothing to do
         }
         _ => {
-            eprintln!("Error in socket message got notification in connection message")
+            eprintln!("Error in socket message got notification in connection message");
         }
     }
 }
@@ -234,8 +231,7 @@ async fn parse_connection_notification_message(
         api_structs::MessageType::Notification => {
             let api_structs::WebsocketPayload::Notification(subscription) = payload else {
                 eprintln!(
-                    "Error unknown reply expected subscription notification got:\n{:?}",
-                    payload
+                    "Error unknown reply expected subscription notification got:\n{payload:?}"
                 );
                 return;
             };
@@ -251,10 +247,7 @@ async fn parse_connection_notification_message(
         }
         api_structs::MessageType::Revocation => {
             let api_structs::WebsocketPayload::Revocation(subscription) = payload else {
-                eprintln!(
-                    "Error unknown reply expected revocation notification got:\n{:?}",
-                    payload
-                );
+                eprintln!("Error unknown reply expected revocation notification got:\n{payload:?}");
                 return;
             };
             if subscription.subscription.status
@@ -283,7 +276,7 @@ async fn parse_connection_notification_message(
             }
         }
         _ => {
-            eprintln!("Error in socket message got connection message in notification")
+            eprintln!("Error in socket message got connection message in notification");
         }
     }
 }
@@ -294,9 +287,9 @@ async fn reconnect_websocket(
     WebSocketStream<MaybeTlsStream<TcpStream>>,
     Response<Option<Vec<u8>>>,
 ) {
+    const MAX_WAIT: Duration = Duration::new(180, 0);
     let connector =
         tokio_tungstenite::Connector::NativeTls(native_tls::TlsConnector::new().unwrap());
-    const MAX_WAIT: Duration = Duration::new(180, 0);
     let mut time = Duration::new(1, 0);
     let mut new_stream =
         connect_async_tls_with_config(websocket_url, None, false, Some(connector)).await;
@@ -384,6 +377,10 @@ async fn subscribe_to_event(
 #[cfg(test)]
 mod tests {
 
+    use super::*;
+    use tokio::sync::mpsc;
+    use tokio::task;
+
     use std::str::FromStr;
 
     use tokio::{process, time::timeout};
@@ -405,10 +402,6 @@ mod tests {
         ));
         let twitch_user_access_token = Arc::new(user_access_token);
 
-        use super::*;
-        use tokio::sync::mpsc;
-        use tokio::task;
-
         let (id_sender, id_reciever) = mpsc::channel(10);
         let (socket_sender, mut socket_reciever) = mpsc::channel(10);
         let (restart_signal_sender, _) = mpsc::channel(1);
@@ -429,7 +422,7 @@ mod tests {
                 twitch_user_access_token,
                 "AAAA",
             )
-            .await
+            .await;
         });
 
         id_sender.send(30423375).await.unwrap();
@@ -475,19 +468,19 @@ mod tests {
                 twitch_user_access_token,
                 "AAAA",
             )
-            .await
+            .await;
         });
-        id_sender.send(641972806).await.unwrap();
+        id_sender.send(641_972_806).await.unwrap();
         assert_eq!(
             socket_reciever.recv().await,
             Some((String::from("live"), String::from("kaicenat")))
         );
-        id_sender.send(411377640).await.unwrap();
+        id_sender.send(411_377_640).await.unwrap();
         assert_eq!(
             socket_reciever.recv().await,
             Some((String::from("live"), String::from("jynxzi")))
         );
-        id_sender.send(207813352).await.unwrap();
+        id_sender.send(207_813_352).await.unwrap();
         assert_eq!(
             socket_reciever.recv().await,
             Some((String::from("live"), String::from("hasanabi")))

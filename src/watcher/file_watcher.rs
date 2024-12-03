@@ -63,7 +63,7 @@ pub async fn file_watcher(
 
 #[cfg(test)]
 mod test {
-    use crate::StreamConfig;
+    use crate::watcher::StreamConfig;
 
     use super::*;
 
@@ -78,21 +78,21 @@ mod test {
 
         let kai = StreamConfig {
             name: String::from("kaicenat"),
-            id: 641972806,
+            id: 641_972_806,
             quality_overides: vec![(String::from("normal"), 480), (String::from("low-data"), 0)],
             streams_to_close_on: Vec::new(),
             streams_to_open_on: Vec::new(),
         };
         let hasan = StreamConfig {
             name: String::from("hasanabi"),
-            id: 207813352,
+            id: 207_813_352,
             quality_overides: vec![(String::from("normal"), 480), (String::from("low-data"), 0)],
             streams_to_close_on: Vec::new(),
             streams_to_open_on: Vec::new(),
         };
         let jynxzi = StreamConfig {
             name: String::from("jynxzi"),
-            id: 411377640,
+            id: 411_377_640,
             quality_overides: vec![(String::from("normal"), 480), (String::from("low-data"), 0)],
             streams_to_close_on: Vec::new(),
             streams_to_open_on: Vec::new(),
@@ -102,9 +102,9 @@ mod test {
         let (config_sender, mut config_reciever) = mpsc::channel(5);
 
         file_watcher(id_sender, config_sender, path, &streams).await;
-        assert_eq!(id_reciever.recv().await, Some(641972806));
-        assert_eq!(id_reciever.recv().await, Some(207813352));
-        assert_eq!(id_reciever.recv().await, Some(411377640));
+        assert_eq!(id_reciever.recv().await, Some(641_972_806));
+        assert_eq!(id_reciever.recv().await, Some(207_813_352));
+        assert_eq!(id_reciever.recv().await, Some(411_377_640));
         assert_eq!(id_reciever.recv().await, None);
         assert_eq!(config_reciever.recv().await, Some(kai));
         assert_eq!(config_reciever.recv().await, Some(hasan));

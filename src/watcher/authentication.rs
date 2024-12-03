@@ -10,7 +10,7 @@ use twitch_oauth2::{
 pub async fn validate_oauth_token(
     user_access_token: &mut Option<UserToken>,
     path: &Path,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error + Sync + Send>> {
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
@@ -64,27 +64,31 @@ pub async fn create_oauth_token(
     let mut token = ImplicitUserTokenBuilder::new(id, redirect_url).force_verify(true);
 
     let (url, _) = token.generate_url();
-    println!("Go to this page: {}", url);
+    println!("Go to this page: {url}");
 
     let input = rpassword::prompt_password(
         "Paste in the resulting adress after authenticating (input hidden): ",
     )?;
 
-    let u = url::Url::parse(&input)?;
+    let input_url = url::Url::parse(&input)?;
 
-    let map: std::collections::HashMap<_, _> = match u.fragment() {
-        Some(fragment) => fragment
-            .split('&')
-            .map(|query| {
-                let query_tuple = query.split_once('=').expect("Malformed url");
-                (query_tuple.0.to_owned(), query_tuple.1.to_owned())
-            })
-            .collect(),
-        None => u
-            .query_pairs()
-            .map(|cow_query| (cow_query.0.to_string(), cow_query.1.to_string()))
-            .collect(),
-    };
+    let map: std::collections::HashMap<_, _> = input_url.fragment().map_or_else(
+        || {
+            input_url
+                .query_pairs()
+                .map(|cow_query| (cow_query.0.to_string(), cow_query.1.to_string()))
+                .collect()
+        },
+        |fragment| {
+            fragment
+                .split('&')
+                .map(|query| {
+                    let query_tuple = query.split_once('=').expect("Malformed url");
+                    (query_tuple.0.to_owned(), query_tuple.1.to_owned())
+                })
+                .collect()
+        },
+    );
 
     let user_token = match (map.get("access_token"), map.get("state")) {
         (Some(access_token), Some(state)) => {

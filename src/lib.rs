@@ -2,69 +2,17 @@ mod watcher;
 pub use crate::watcher::authentication::create_oauth_token;
 pub use crate::watcher::player::get_stream;
 pub use crate::watcher::Player;
+pub use crate::watcher::Settings;
+pub use crate::watcher::Streams;
 
-use crate::watcher::*;
+use crate::watcher::{
+    authentication, event_handler, file_watcher, tasks_handler, twitch_socket, UserData,
+};
 use std::{
-    path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::Duration,
 };
 use tokio::{sync::mpsc, task};
-
-pub fn read_config(paths: Vec<PathBuf>) -> Settings {
-    let mut local_path = paths.last().unwrap_or(&PathBuf::new()).clone();
-
-    for path in paths {
-        if path.as_path().join("config.json").exists() {
-            let config = std::fs::read_to_string(path.join("config.json"));
-            match config {
-                Ok(settings) => match serde_json::from_str(&settings) {
-                    Ok(json) => return json,
-                    Err(error) => {
-                        eprintln!("Error deserializing data: {}", error);
-                        return Settings::new(path);
-                    }
-                },
-                Err(error) => {
-                    eprintln!("Error opening config file: {}", error);
-                    return Settings::new(path);
-                }
-            }
-        }
-    }
-    let new_settings = Settings::new(local_path.clone());
-    if let Ok(data) = serde_json::to_string(&new_settings) {
-        std::fs::create_dir(&local_path).expect("Unable to create directory");
-
-        local_path.push("config.json");
-
-        std::fs::write(&local_path, data).unwrap_or_else(|_| {
-            eprintln!(
-                "Unable to write to file: {}",
-                local_path.to_str().expect("Non UTF-8 String")
-            );
-        });
-    }
-
-    new_settings
-}
-
-pub fn read_streams(path: &Path) -> Streams {
-    let file = std::fs::read_to_string(path.join("schedule.json"));
-    match file {
-        Ok(data) => match serde_json::from_str(&data) {
-            Ok(json) => json,
-            Err(error) => {
-                eprintln!("Error deserializing data: {}", error);
-                Streams::new()
-            }
-        },
-        Err(error) => {
-            eprint!("Error opening file: {}", error);
-            Streams::new()
-        }
-    }
-}
 
 pub const CLIENT_ID: &str = "uty2ua26tqh28rzn3jketggzu98t6b";
 
@@ -86,11 +34,10 @@ pub async fn run(settings: &Arc<Settings>, streams: &Arc<Mutex<Streams>>) {
         let mut token: Option<twitch_oauth2::tokens::UserToken> = None;
         loop {
             match authentication::validate_oauth_token(&mut token, &settings.schedule).await {
-                Ok(_) => break,
+                Ok(()) => break,
                 Err(error) => {
                     eprintln!(
-                        "Error {}.\nPlease retry creating a token. Re-checking token in 60 seconds",
-                        error
+                        "Error {error}.\nPlease retry creating a token. Re-checking token in 60 seconds"
                     );
                     tokio::time::sleep(Duration::from_secs(60)).await;
                 }
@@ -129,7 +76,7 @@ pub async fn run(settings: &Arc<Settings>, streams: &Arc<Mutex<Streams>>) {
                     &settings_path.schedule,
                     &streams,
                 )
-                .await
+                .await;
             });
             task::spawn(async move {
                 twitch_socket::twitch_websocket(
@@ -141,7 +88,7 @@ pub async fn run(settings: &Arc<Settings>, streams: &Arc<Mutex<Streams>>) {
                     user_access_token_websocket,
                     CLIENT_ID,
                 )
-                .await
+                .await;
             });
             task::spawn(async move {
                 event_handler::event_handler(
@@ -150,7 +97,7 @@ pub async fn run(settings: &Arc<Settings>, streams: &Arc<Mutex<Streams>>) {
                     event_handler_file_watcher_reciever,
                     event_handler_task_spawner_sender,
                 )
-                .await
+                .await;
             });
             task::spawn(async move {
                 tasks_handler::task_spawner(
@@ -159,7 +106,7 @@ pub async fn run(settings: &Arc<Settings>, streams: &Arc<Mutex<Streams>>) {
                     settings_player.player,
                     STREAMING_SITE.to_string(),
                 )
-                .await
+                .await;
             });
             task::spawn(async move {
                 tasks_handler::exit_handler(
@@ -170,18 +117,14 @@ pub async fn run(settings: &Arc<Settings>, streams: &Arc<Mutex<Streams>>) {
                     user_access_token_exit_handler,
                     CLIENT_ID,
                 )
-                .await
+                .await;
             });
 
             if let Some(code) = restart_signal_reciever.recv().await {
-                println!("Code restart code: {}", code);
+                println!("Code restart code: {code}");
                 match code {
-                    1 => {
-                        continue;
-                    }
-                    2 => {
-                        break;
-                    }
+                    1 => continue,
+                    2 => break,
                     _ => println!("Unrecognized code"),
                 }
             } else {

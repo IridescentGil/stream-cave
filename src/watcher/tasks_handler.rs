@@ -26,7 +26,7 @@ pub async fn task_spawner(
             sender_clone
                 .send((streamer_name, player_func.await))
                 .await
-                .unwrap()
+                .unwrap();
         });
     }
 }
@@ -56,7 +56,7 @@ pub async fn exit_handler(
                 .await;
             }
             Err(error) => {
-                eprintln!("Error starting stream: {}", error);
+                eprintln!("Error starting stream: {error}");
             }
         }
     }
@@ -72,9 +72,8 @@ async fn handle_exit_status<'a>(
     client_id: &'a str,
 ) {
     if !exit_status.success() {
-        let mut wait_time = Duration::from_secs(1);
         const MAX_WAIT_TIME: Duration = Duration::from_secs(180);
-
+        let mut wait_time = Duration::from_secs(1);
         loop {
             let request = reqwest::Client::new()
                 .get(api_url)
@@ -155,7 +154,7 @@ mod tests {
 
     async fn create_key(port: u16) -> (Option<UserToken>, String) {
         let clients = reqwest::Client::new()
-            .get(format!("http://localhost:{}/units/clients", port))
+            .get(format!("http://localhost:{port}/units/clients"))
             .send()
             .await
             .unwrap()
@@ -179,13 +178,13 @@ mod tests {
             .collect();
 
         let auth = reqwest::Client::new()
-            .post(format!("http://localhost:{}/auth/authorize", port))
+            .post(format!("http://localhost:{port}/auth/authorize"))
             .query(&[
                 ("client_id", &client_id),
                 ("client_secret", &secret),
                 ("grant_type", &"user_token".to_string()),
                 ("user_id", &"96359538".to_string()),
-                ("scope", &"".to_string()),
+                ("scope", &String::new()),
             ])
             .send()
             .await
@@ -240,7 +239,7 @@ mod tests {
     #[tokio::test]
     async fn handle_good_exit() {
         const PORT: u16 = 5421;
-        let api_url = format!("http://localhost:{}/mock/search/channels", PORT);
+        let api_url = format!("http://localhost:{PORT}/mock/search/channels");
         let (process_sender, process_reciever) = mpsc::channel(10);
         let (exit_sender, exit_reciever) = mpsc::channel(10);
         let (restart_signal_sender, _) = mpsc::channel(1);
@@ -282,7 +281,7 @@ mod tests {
     #[tokio::test]
     async fn handle_bad_exit() {
         const PORT: u16 = 5422;
-        let api_url = format!("http://localhost:{}/mock/search/channels", PORT);
+        let api_url = format!("http://localhost:{PORT}/mock/search/channels");
         let (process_sender, process_reciever) = mpsc::channel(10);
         let (exit_sender, mut exit_reciever) = mpsc::channel(10);
         let (restart_signal_sender, _) = mpsc::channel(1);
@@ -329,7 +328,7 @@ mod tests {
     #[tokio::test]
     async fn handle_bad_exit_stream_ended() {
         const PORT: u16 = 8502;
-        let api_url = format!("http://localhost:{}/mock/search/channels", PORT);
+        let api_url = format!("http://localhost:{PORT}/mock/search/channels");
         let (process_sender, process_reciever) = mpsc::channel(10);
         let (exit_sender, exit_reciever) = mpsc::channel(10);
         let (restart_signal_sender, _) = mpsc::channel(1);
@@ -371,7 +370,7 @@ mod tests {
     #[tokio::test]
     async fn handle_no_internet_exit() {
         const PORT: u16 = 8423;
-        let api_url = format!("http://localhost:{}/mock/search/channels", PORT);
+        let api_url = format!("http://localhost:{PORT}/mock/search/channels");
         let (process_sender, process_reciever) = mpsc::channel(10);
         let (exit_sender, exit_reciever) = mpsc::channel(10);
         let (restart_signal_sender, _) = mpsc::channel(1);
