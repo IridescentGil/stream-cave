@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
 use stream_watcher::create_oauth_token;
@@ -71,6 +71,8 @@ struct PlayArgs {
     quality: Option<String>,
 }
 
+const CLIENT_ID: &str = "uty2ua26tqh28rzn3jketggzu98t6b";
+
 #[tokio::main]
 async fn main() {
     let args = Cli::parse();
@@ -111,13 +113,11 @@ async fn main() {
                 match action {
                     TokenActions::Create(arg) => {
                         if let Some(path) = &arg.config {
-                            create_oauth_token(stream_watcher::CLIENT_ID, path.as_path())
-                                .await
-                                .unwrap();
+                            create_oauth_token(CLIENT_ID, path.as_path()).await.unwrap();
                         } else if let Some(path) =
                             directories::ProjectDirs::from("com", "Iridescent", "Stream Watcher")
                         {
-                            create_oauth_token(stream_watcher::CLIENT_ID, path.config_dir())
+                            create_oauth_token(CLIENT_ID, path.config_dir())
                                 .await
                                 .unwrap();
                         }

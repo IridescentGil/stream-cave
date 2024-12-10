@@ -9,6 +9,27 @@ use tokio::{
     time::sleep,
 };
 
+/// Spawn video player. The configuration is based on what is recieved from `event_handler`. The
+/// result is sent to `exit_handler`.
+///
+/// # Examples
+/// ```no_run
+/// use stream_watcher::tasks_handler::task_spawner;
+/// use stream_watcher::Player;
+///
+/// use tokio::sync::mpsc;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let (tx1, rx1) = mpsc::channel(5);
+///     let (tx2, mut rx2) = mpsc::channel(5);
+///
+///     tx1.send((String::from("jynxzi"), 720)).await.unwrap();
+///     task_spawner(rx1, tx2, Player::Mpv, String::from("https://www.twitch.tv/")).await;
+///
+///     let status = rx2.recv().await;
+/// }
+/// ```
 pub async fn task_spawner(
     mut task_spawner_event_handler_reciever: Receiver<(String, u16)>,
     task_spawner_exit_handler_sender: Sender<(
@@ -26,10 +47,45 @@ pub async fn task_spawner(
             sender_clone
                 .send((streamer_name, player_func.await))
                 .await
-                .unwrap();
+                .unwrap_or_else(|error| {
+                    eprintln!("Error while attempting to hand over player monitoring: {error}");
+                });
         });
     }
 }
+
+/// Handle player exit. Based on the exit status of the player restart streams that close
+/// unexpectedly.
+///
+/// # Examples
+/// ```no_run
+/// use stream_watcher::tasks_handler::{task_spawner, exit_handler};
+/// use stream_watcher::authentication;
+/// use stream_watcher::{Player, Settings};
+///
+/// use tokio::sync::mpsc;
+/// use std::sync::Arc;
+/// use std::path::Path;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     const CLIENT_ID: &str = "AAAAAAA";
+///     let mut token = None;
+///     let settings = Settings::new(&Path::new("./"));
+///     let (tx1, rx1) = mpsc::channel(5);
+///     let (tx2, rx2) = mpsc::channel(5);
+///     let (tx3, mut rx3) = mpsc::channel(5);
+///     let (restart_sender, _) = mpsc::channel(1);
+///
+///     authentication::validate_oauth_token(&mut token, &settings.schedule).await.unwrap();
+///     tx1.send((String::from("jynxzi"), 720)).await.unwrap();
+///     task_spawner(rx1, tx2, Player::Mpv, String::from("https://www.twitch.tv/")).await;
+///     let twitch_user_token = Arc::new(token);
+///     exit_handler(rx2, tx3, restart_sender, String::from("https://api.twitch.tv/helix/search/channels"), twitch_user_token , CLIENT_ID).await;
+///
+///     let retry_signal = rx3.recv().await;
+/// }
+/// ```
 pub async fn exit_handler(
     mut exit_handler_task_spawner_reciever: Receiver<(
         String,
@@ -71,6 +127,11 @@ async fn handle_exit_status<'a>(
     user_access_token: &'a Arc<Option<UserToken>>,
     client_id: &'a str,
 ) {
+    let Some(user_access_token) = (**user_access_token).as_ref() else {
+        eprintln!("Error attempting to access Twitch oauth2 token. No token found.");
+        return;
+    };
+
     if !exit_status.success() {
         const MAX_WAIT_TIME: Duration = Duration::from_secs(180);
         let mut wait_time = Duration::from_secs(1);
@@ -78,13 +139,7 @@ async fn handle_exit_status<'a>(
             let request = reqwest::Client::new()
                 .get(api_url)
                 .query(&[("query", &stream_name)])
-                .bearer_auth(
-                    (**user_access_token)
-                        .as_ref()
-                        .unwrap()
-                        .access_token
-                        .as_str(),
-                )
+                .bearer_auth(user_access_token.access_token.as_str())
                 .header("Client-Id", client_id)
                 .send()
                 .await;
@@ -93,30 +148,44 @@ async fn handle_exit_status<'a>(
                 Ok(response) => {
                     if response.status() == 200 {
                         let search_results = response.json::<api_structs::StreamSearch>().await;
-                        if search_results.is_err() {
-                            eprintln!("Error malformed response data recieved when checking stream status after bad exit");
+                        let Ok(json_data) = search_results else {
+                            eprintln!("Error malformed response data recieved when checking stream status after player closed.");
                             return;
-                        }
-                        let json_data = search_results.unwrap();
-                        let is_live = json_data
+                        };
+
+                        let Some(stream_status) = json_data
                             .data
                             .iter()
                             .find(|data_set| data_set.broadcaster_login == stream_name)
-                            .unwrap()
-                            .is_live;
+                        else {
+                            eprintln!("Unable to find streamer after when checking stream status after player closed.");
+                            return;
+                        };
+                        let is_live = stream_status.is_live;
+
                         if is_live {
                             exit_handler_event_handler_sender
                                 .send((String::from("retry"), stream_name))
                                 .await
-                                .unwrap();
+                                .unwrap_or_else(|error| {
+                                    eprintln!("Error while attempting to restart stream: {error}");
+                                });
                             return;
                         }
                     } else if response.status() == 401 {
                         let _ = restart_signal_sender.send(2).await;
                         return;
                     } else {
-                        eprintln!("Unexpected response:{}", response.text().await.unwrap());
-                        return;
+                        match response.text().await {
+                            Ok(text) => {
+                                eprintln!("Unexpected response: {text}");
+                                return;
+                            }
+                            Err(error) => {
+                                eprintln!("Error when parsing Twitch api respone text: {error}");
+                                return;
+                            }
+                        }
                     }
                 }
                 Err(error) => {
@@ -127,9 +196,7 @@ async fn handle_exit_status<'a>(
                     };
 
                     eprintln!(
-                        "Error {}\n re-attempting api call for {}'s stream status in {} secs",
-                        error,
-                        stream_name,
+                        "Error {error}\n re-attempting api call for {stream_name}'s stream status in {} secs",
                         wait_time.as_secs()
                     );
                     sleep(wait_time).await;

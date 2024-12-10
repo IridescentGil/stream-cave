@@ -29,7 +29,7 @@ pub struct ReplyMetadata {
     pub message_timestamp: String,
 }
 
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum MessageType {
     SessionWelcome,
@@ -73,7 +73,7 @@ pub struct WebsocketSession {
     pub reconnect_url: Option<String>,
 }
 
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum WebsocketConnectionStatus {
     Connected,
@@ -93,7 +93,7 @@ pub struct WebsocketSubscription {
     pub created_at: String,
 }
 
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SubscriptionStatus {
     Enabled,
@@ -124,7 +124,7 @@ pub struct WebsocketEvent {
     pub started_at: String,
 }
 
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum EventType {
     Live,
@@ -144,8 +144,9 @@ pub struct SubscriptionBody {
 }
 
 impl SubscriptionBody {
+    #[must_use]
     pub fn new_live_sub(id: u32, session_id: String) -> Self {
-        SubscriptionBody {
+        Self {
             subscritpion_type: String::from("stream.online"),
             version: String::from("1"),
             condition: Condition {
@@ -159,18 +160,18 @@ impl SubscriptionBody {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct StreamSearch {
     pub data: Vec<SearchData>,
     pagination: Option<Pagination>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct Pagination {
     cursor: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct SearchData {
     broadcaster_language: String,
     pub broadcaster_login: String,

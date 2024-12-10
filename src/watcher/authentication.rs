@@ -7,6 +7,28 @@ use twitch_oauth2::{
     url, ImplicitUserTokenBuilder,
 };
 
+/// Validate the given the token found in the directory. If the token is valid modify
+/// `user_access_token`.
+///
+/// # Errors
+/// The function can fail due to various errors most notably network errors and an invalid token.
+///
+/// # Panics
+/// If there token authentication returns an unkown error the function will panic
+///
+/// # Examples
+/// ```no_run
+/// #[tokio::main]
+/// async fn main() {
+/// use stream_watcher::authentication::validate_oauth_token;
+/// use std::path::Path;
+///
+/// let mut token = None;
+/// let path = Path::new("./");
+///
+/// validate_oauth_token(&mut token, &path).await.unwrap();
+/// }
+/// ```
 pub async fn validate_oauth_token(
     user_access_token: &mut Option<UserToken>,
     path: &Path,
@@ -51,10 +73,32 @@ pub async fn validate_oauth_token(
     }
 }
 
+/// Create a twitch oauth2 token using implicit grant flow.
+///
+/// # Errors
+/// The function can return error due to an invalid url, a failure in token creation and a failure
+/// in token validation.
+///
+/// # Panics
+/// Panics can hapen when the entered url does not have the proper query url structure
+///
+///# Examples
+///```no_run
+/// #[tokio::main]
+/// async fn main() {
+/// use std::path::Path;
+/// use stream_watcher::create_oauth_token;
+///
+/// let client_id = "someclientid";
+/// let path = Path::new("./");
+///
+/// create_oauth_token(client_id, &path).await.unwrap();
+/// }
+///```
 pub async fn create_oauth_token(
     client_id: &str,
     path: &Path,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
@@ -117,6 +161,3 @@ pub async fn create_oauth_token(
 
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {}

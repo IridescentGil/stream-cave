@@ -2,6 +2,23 @@ use crate::Player;
 use std::{future::Future, process::ExitStatus};
 use tokio::process::Command;
 
+/// Play the given stream and return a future with the exit status.
+///
+/// # Examples
+/// ```no_run
+/// use stream_watcher::get_stream;
+/// use stream_watcher::Player;
+///
+/// #[tokio::main]
+/// async fn main(){
+///     let stream = String::from("https://twitch.tv/jynxzi");
+///     let quality = 720;
+///
+///     let play = get_stream(Player::Mpv, stream, quality).await;
+/// }
+/// ```
+///
+///
 pub async fn get_stream<'a, 'b>(
     player: Player,
     stream: String,
@@ -38,7 +55,7 @@ mod tests {
     use super::*;
     #[tokio::test]
     async fn play_mpv() {
-        let video = String::from("tests/resources/video.mkv");
+        let video = String::from("file://./tests/resources/video.mkv");
         let mpv = get_stream(Player::Mpv, video, 1080).await;
 
         let exit_code = mpv.await.unwrap();

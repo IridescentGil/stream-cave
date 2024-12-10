@@ -7,7 +7,50 @@ use tokio::{
 
 use super::StreamConfig;
 
-pub async fn event_handler(
+/// Start the event handling tasks.
+/// Tasks will finish when the senders are closed.
+///
+/// # Panics
+/// If the mutex lock is poisoned the function will panic.
+///
+/// # Examples
+/// ```
+/// use tokio::sync::mpsc;
+/// use stream_watcher::event_handler;
+/// use stream_watcher::StreamConfig;
+///
+/// #[tokio::main]
+/// async fn main() {
+///
+///     let (socket_sender, socket_reciever) = mpsc::channel(10);
+///     let (event_sender, mut event_reciever) = mpsc::channel(10);
+///     let (_, exit_reciever) = mpsc::channel(10);
+///     let (file_sender, file_reciever) = mpsc::channel(10);
+///
+///     let streamer = StreamConfig {
+///         name: String::from("kaicenat"),
+///         id: 641_972_806,
+///         quality_overides: vec![(String::from("normal"), 480)],
+///         streams_to_close_on: Vec::new(),
+///         streams_to_open_on: Vec::new(),
+///     };
+///
+///         event_handler::event_handler(socket_reciever, exit_reciever, file_reciever, event_sender);
+///
+///     file_sender.send(streamer).await.unwrap();
+///
+///     socket_sender
+///         .send((String::from("live"), String::from("kaicenat")))
+///         .await
+///         .unwrap();
+///
+///     assert_eq!(
+///         Some((String::from("kaicenat"), 480)),
+///         event_reciever.recv().await
+///     );
+/// }
+/// ```
+pub fn event_handler(
     mut event_handler_twitch_websocket_reciever: Receiver<(String, String)>,
     mut event_handler_exit_handler_reciever: Receiver<(String, String)>,
     mut event_handler_file_watcher_reciever: Receiver<StreamConfig>,
@@ -58,21 +101,13 @@ async fn handle_event(
     let mut stream_quality = global_profile.1;
 
     yield_now().await;
-    let found_configurations = configs
+    if let Some(config) = configs
         .lock()
         .as_ref()
         .expect("Mutex lock poisoned")
         .iter()
-        .filter(|streamer| streamer.name == stream.1)
-        .count();
-    if found_configurations == 1 {
-        let streamer_configs = configs.lock();
-        let config = streamer_configs
-            .as_ref()
-            .expect("Mutex lock poisoned")
-            .iter()
-            .find(|streamer| streamer.name == stream.1)
-            .unwrap();
+        .find(|streamer| streamer.name == stream.1)
+    {
         let global_quality_overrides = &config.quality_overides;
         if let Some(current_profile_override) = global_quality_overrides
             .iter()
@@ -83,7 +118,10 @@ async fn handle_event(
     }
 
     let task = (stream.1.clone(), stream_quality);
-    sender.send(task).await.unwrap();
+    sender
+        .send(task)
+        .await
+        .expect("Task spawner reciever closed");
 }
 
 #[cfg(test)]
@@ -99,7 +137,7 @@ mod tests {
         let (_, file_reciever) = mpsc::channel(10);
 
         task::spawn(async {
-            event_handler(socket_reciever, exit_reciever, file_reciever, event_sender).await;
+            event_handler(socket_reciever, exit_reciever, file_reciever, event_sender);
         });
 
         socket_sender
@@ -129,7 +167,7 @@ mod tests {
         };
 
         task::spawn(async {
-            event_handler(socket_reciever, exit_reciever, file_reciever, event_sender).await;
+            event_handler(socket_reciever, exit_reciever, file_reciever, event_sender);
         });
 
         file_sender.send(streamer).await.unwrap();
@@ -161,7 +199,7 @@ mod tests {
         };
 
         task::spawn(async {
-            event_handler(socket_reciever, exit_reciever, file_reciever, event_sender).await;
+            event_handler(socket_reciever, exit_reciever, file_reciever, event_sender);
         });
 
         file_sender.send(streamer).await.unwrap();
@@ -192,7 +230,7 @@ mod tests {
         };
 
         task::spawn(async {
-            event_handler(socket_reciever, exit_reciever, file_reciever, event_sender).await;
+            event_handler(socket_reciever, exit_reciever, file_reciever, event_sender);
         });
 
         file_sender.send(streamer).await.unwrap();

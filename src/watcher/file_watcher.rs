@@ -8,55 +8,55 @@ use tokio::sync::mpsc::Sender;
 
 use super::StreamConfig;
 
+/// Watch the stream configurations file for changes, read stream configurations from `streams` and
+/// send both the existing and new configurations to `event_handler` and `twitch_websocket`
+///
+/// # Panics
+/// If the Mutex lock is poison the function will panic.
+///
+/// # Examples
+/// ```
+/// use stream_watcher::{Settings, Streams, file_watcher};
+/// use tokio::sync::mpsc;
+/// use std::path::Path;
+/// use std::sync::{Arc, Mutex};
+///
+/// #[tokio::main]
+/// async fn main(){
+///     let streams = Arc::new(Mutex::new(Streams::new()));
+///     let (tx1, rx1) = mpsc::channel(5);
+///     let (tx2, rx2) = mpsc::channel(5);
+///     let streams_path = Path::new("./");
+///     
+///     file_watcher::file_watcher(tx1, tx2, &streams_path, &streams).await;
+/// }
+/// ```
 pub async fn file_watcher(
     file_watcher_twitch_websocket_sender: Sender<u32>,
     file_watcher_event_handler_sender: Sender<StreamConfig>,
     _streams_path: &Path,
     streams: &Arc<Mutex<Streams>>,
 ) {
-    let streamers = streams
-        .lock()
-        .as_ref()
-        .expect("Mutex lock poisoned")
-        .names
-        .clone();
-    let streamers = streamers.iter();
-    let quality_iter = streams
-        .lock()
-        .as_ref()
-        .expect("Mutex lock poisoned")
-        .quality_overides
-        .clone();
-    let mut quality_iter = quality_iter.iter();
-    let open_on_iter = streams
-        .lock()
-        .as_ref()
-        .expect("Mutex lock poisoned")
-        .streams_to_open_on
-        .clone();
-    let mut open_on_iter = open_on_iter.iter();
-    let close_on_iter = streams
-        .lock()
-        .as_ref()
-        .expect("Mutex lock poisoned")
-        .streams_to_close_on
-        .clone();
-    let mut close_on_iter = close_on_iter.iter();
+    let streams_clone = streams.lock().expect("Mutex lock poisoned").clone();
+    let streamers = streams_clone.names.into_iter();
+    let mut quality_iter = streams_clone.quality_overides.into_iter();
+    let mut open_on_iter = streams_clone.streams_to_open_on.into_iter();
+    let mut close_on_iter = streams_clone.streams_to_close_on.into_iter();
     for streamer in streamers {
         file_watcher_twitch_websocket_sender
             .send(streamer.1)
             .await
-            .unwrap();
+            .expect("Twitch websocket reciever is closed");
         file_watcher_event_handler_sender
             .send(StreamConfig {
-                name: streamer.0.clone(),
+                name: streamer.0,
                 id: streamer.1,
-                quality_overides: quality_iter.next().unwrap_or(&Vec::new()).clone(),
-                streams_to_close_on: open_on_iter.next().unwrap_or(&Vec::new()).clone(),
-                streams_to_open_on: close_on_iter.next().unwrap_or(&Vec::new()).clone(),
+                quality_overides: quality_iter.next().unwrap_or_default(),
+                streams_to_close_on: open_on_iter.next().unwrap_or_default(),
+                streams_to_open_on: close_on_iter.next().unwrap_or_default(),
             })
             .await
-            .unwrap();
+            .expect("Event handler reciever is closed");
     }
     // TODO: Add functionality to watch schedule file and send changes
 }

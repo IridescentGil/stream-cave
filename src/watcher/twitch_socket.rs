@@ -19,7 +19,40 @@ use tokio_tungstenite::{
     MaybeTlsStream, WebSocketStream,
 };
 
-pub async fn twitch_websocket<'a: 'static>(
+/// Create and manage twitch websocket connections and subscribe to twitch streamer live events.
+///
+/// Uses id's recieved from `file_watcher` to subscribe to events. When encountering a websocket
+/// error or an invalid token it will send a signal through `restart_signal_sender`.
+///
+/// # Panics
+/// Mutex lock poisoning will cause this function to panic.
+///
+/// # Examples
+/// ```no_run
+/// use tokio::sync::mpsc;
+/// use std::sync::Arc;
+/// use std::path::Path;
+/// use stream_watcher::{Settings, twitch_socket, authentication};
+///
+/// #[tokio::main]
+/// async fn main(){
+///     const TWITCH_WEBSOCKET_URL: &str = "wss://eventsub.wss.twitch.tv/ws";
+///     const TWITCH_API_URL: &str = "https://api.twitch.tv/helix/eventsub/subscriptions";
+///     const CLIENT_ID: &str = "AAAAAAAAA";
+///     let (restart_signal_sender, restart_signal_reciever) = mpsc::channel(1);
+///     let (event_handler_sender, event_handler_reciever) = mpsc::channel(5);
+///     let (file_watcher_sender, file_watcher_reciever) = mpsc::channel(5);
+///
+///     let mut token = None;
+///     let settings = Settings::new(&Path::new("./"));
+///     authentication::validate_oauth_token(&mut token, &settings.schedule).await.unwrap();
+///
+///     let twitch_user_access_token = Arc::new(token);
+///     twitch_socket::twitch_websocket(file_watcher_reciever, event_handler_sender,
+///     restart_signal_sender, TWITCH_WEBSOCKET_URL, TWITCH_API_URL, twitch_user_access_token, CLIENT_ID);
+/// }
+/// ```
+pub fn twitch_websocket<'a: 'static>(
     mut twitch_socket_file_watcher_reciever: Receiver<u32>,
     twitch_websocket_event_handler_sender: Sender<(String, String)>,
     restart_signal_sender: Sender<u8>,
@@ -35,41 +68,41 @@ pub async fn twitch_websocket<'a: 'static>(
     let session_id_clone = websocket_session_id.clone();
 
     task::spawn(async move {
-        first_name_signal_reciever.recv().await.unwrap();
-
-        parse_stream_message(
-            twitch_websocket_url,
-            websocket_session_id,
-            twitch_websocket_event_handler_sender,
-            &restart_signal_sender,
-        )
-        .await;
+        if first_name_signal_reciever.recv().await == Some(()) {
+            parse_stream_message(
+                twitch_websocket_url,
+                websocket_session_id,
+                twitch_websocket_event_handler_sender,
+                &restart_signal_sender,
+            )
+            .await;
+        }
     });
 
     task::spawn(async move {
         while twitch_socket_file_watcher_reciever.is_empty() {
             yield_now().await;
         }
-        first_name_signal_sender.send(()).await.unwrap();
-
-        while session_id_clone
-            .lock()
-            .as_ref()
-            .expect("Mutex lock poisoned")
-            .is_empty()
-        {
-            sleep(Duration::from_secs(1)).await;
-        }
-        while let Some(id) = twitch_socket_file_watcher_reciever.recv().await {
-            subscribe_to_event(
-                &restart_signal_sender_clone,
-                twitch_api_url,
-                &twitch_user_access_token,
-                id,
-                &session_id_clone,
-                client_id,
-            )
-            .await;
+        if first_name_signal_sender.send(()).await == Ok(()) {
+            while session_id_clone
+                .lock()
+                .as_ref()
+                .expect("Mutex lock poisoned")
+                .is_empty()
+            {
+                sleep(Duration::from_secs(1)).await;
+            }
+            while let Some(id) = twitch_socket_file_watcher_reciever.recv().await {
+                subscribe_to_event(
+                    &restart_signal_sender_clone,
+                    twitch_api_url,
+                    &twitch_user_access_token,
+                    id,
+                    &session_id_clone,
+                    client_id,
+                )
+                .await;
+            }
         }
     });
 }
@@ -80,8 +113,9 @@ async fn parse_stream_message(
     twitch_websocket_event_handler_sender: Sender<(String, String)>,
     restart_signal_sender: &Sender<u8>,
 ) {
-    let connector =
-        tokio_tungstenite::Connector::NativeTls(native_tls::TlsConnector::new().unwrap());
+    let connector = tokio_tungstenite::Connector::NativeTls(
+        native_tls::TlsConnector::new().expect("Unable to find TLS configuration"),
+    );
     let (mut ws_stream, _) =
         match connect_async_tls_with_config(websocket_url, None, false, Some(connector)).await {
             Ok(conect) => conect,
@@ -125,7 +159,10 @@ async fn parse_twitch_webocket_messages<'a>(
     match connection {
         Ok(message) => {
             if !message.is_ping() && !message.is_pong() && !message.is_close() {
-                let message = message.to_text().unwrap();
+                let Ok(message) = message.to_text() else {
+                    eprintln!("Error while parsing websocket message");
+                    return Err(-2);
+                };
                 let parsed: api_structs::TwitchApi = serde_json::from_str(message)
                     .unwrap_or_else(|_| panic!("Unable to parse json response: \n{message}"));
 
@@ -159,7 +196,14 @@ async fn parse_twitch_websocket_json<'a>(
 ) {
     match metadata {
         api_structs::WebsocketMetadata::Reply(reply) => {
-            parse_connection_reply_message(reply, payload, websocket_session_id, ws_stream).await;
+            parse_connection_reply_message(
+                restart_signal_sender,
+                reply,
+                payload,
+                websocket_session_id,
+                ws_stream,
+            )
+            .await;
         }
         api_structs::WebsocketMetadata::Notification(notification) => {
             parse_connection_notification_message(
@@ -174,6 +218,7 @@ async fn parse_twitch_websocket_json<'a>(
 }
 
 async fn parse_connection_reply_message<'a>(
+    restart_signal_sender: &'a Sender<u8>,
     reply: api_structs::ReplyMetadata,
     payload: api_structs::WebsocketPayload,
     websocket_session_id: &'a Arc<Mutex<String>>,
@@ -198,19 +243,31 @@ async fn parse_connection_reply_message<'a>(
                 return;
             };
 
-            let connector =
-                tokio_tungstenite::Connector::NativeTls(native_tls::TlsConnector::new().unwrap());
-            let (new_stream, _) = connect_async_tls_with_config(
-                &reconnect.session.reconnect_url.unwrap(),
+            let connector = tokio_tungstenite::Connector::NativeTls(
+                native_tls::TlsConnector::new().expect("Unable to find TLS configuration"),
+            );
+            let connection_result = connect_async_tls_with_config(
+                &reconnect
+                    .session
+                    .reconnect_url
+                    .expect("Expected reconect url"),
                 None,
                 false,
                 Some(connector),
             )
-            .await
-            .unwrap();
+            .await;
 
-            *ws_stream = new_stream;
-            println!("Changed connection due to reconnect request");
+            match connection_result {
+                Ok(websocket) => {
+                    let (new_stream, _) = websocket;
+                    *ws_stream = new_stream;
+                    println!("Changed connection due to reconnect request");
+                }
+                Err(error) => {
+                    eprintln!("Error: {error},\nattempting to reconnect");
+                    let _ = restart_signal_sender.send(1).await;
+                }
+            }
         }
         api_structs::MessageType::SessionKeepalive => {
             // Nothing to do
@@ -242,7 +299,11 @@ async fn parse_connection_notification_message(
                 twitch_websocket_event_handler_sender
                     .send((String::from("live"), stream_name))
                     .await
-                    .unwrap();
+                    .unwrap_or_else(|error| {
+                        eprintln!(
+                            "Encountered error while sending notification from websocket:\n{error}"
+                        );
+                    });
             }
         }
         api_structs::MessageType::Revocation => {
@@ -288,15 +349,17 @@ async fn reconnect_websocket(
     Response<Option<Vec<u8>>>,
 ) {
     const MAX_WAIT: Duration = Duration::new(180, 0);
-    let connector =
-        tokio_tungstenite::Connector::NativeTls(native_tls::TlsConnector::new().unwrap());
+    let connector = tokio_tungstenite::Connector::NativeTls(
+        native_tls::TlsConnector::new().expect("Unable to find TLS configuration"),
+    );
     let mut time = Duration::new(1, 0);
     let mut new_stream =
         connect_async_tls_with_config(websocket_url, None, false, Some(connector)).await;
 
     while new_stream.is_err() {
-        let connector =
-            tokio_tungstenite::Connector::NativeTls(native_tls::TlsConnector::new().unwrap());
+        let connector = tokio_tungstenite::Connector::NativeTls(
+            native_tls::TlsConnector::new().expect("Unable to find TLS configuration"),
+        );
         time = match time.cmp(&MAX_WAIT) {
             std::cmp::Ordering::Less => time * 2,
             std::cmp::Ordering::Greater => MAX_WAIT,
@@ -312,7 +375,7 @@ async fn reconnect_websocket(
     }
     println!("reconnected successfully");
 
-    new_stream.unwrap()
+    new_stream.expect("Expected websocket connection, but found an error")
 }
 
 async fn subscribe_to_event(
@@ -338,7 +401,7 @@ async fn subscribe_to_event(
             .bearer_auth(
                 (**user_access_token)
                     .as_ref()
-                    .unwrap()
+                    .expect("Expected twitch user oauth2 token found none.")
                     .access_token
                     .as_str(),
             )
@@ -352,13 +415,24 @@ async fn subscribe_to_event(
                     let _ = restart_signal_sender.send(2).await;
                     break;
                 } else if response.status() != 202 {
-                    println!(
-                        "Error {}: \n{}",
-                        response.status(),
-                        response.text().await.unwrap()
+                    let response_status = response.status();
+                    match response.text().await {
+                        Ok(text) => {
+                            println!("Error {response_status}: \n{text}");
+                        }
+                        Err(error) => {
+                            eprintln!(
+                        "Error {response_status}: \nEncountered error while attempting to parse response text:\n{error}"
                     );
+                        }
+                    }
                 } else {
-                    println!("Subscribed to event:\n{}", response.text().await.unwrap());
+                    match response.text().await {
+                        Ok(text) => println!("Subscribed to event:\n{text}"),
+                        Err(error) => eprintln!(
+                            "Error while attempting to display subscription response:\n{error}"
+                        ),
+                    }
                 }
                 break;
             }
@@ -421,11 +495,10 @@ mod tests {
                 TWITCH_API_URL,
                 twitch_user_access_token,
                 "AAAA",
-            )
-            .await;
+            );
         });
 
-        id_sender.send(30423375).await.unwrap();
+        id_sender.send(30_423_375).await.unwrap();
 
         sleep(Duration::from_secs(5)).await;
         process::Command::new("twitch-cli")
@@ -441,49 +514,5 @@ mod tests {
         );
         child.kill().await.unwrap();
         child.wait().await.unwrap();
-    }
-
-    #[ignore = "Test needs to be fixed, unknown if twitch cli can subscribe multiple times"]
-    #[tokio::test]
-    async fn recieve_and_send_multuple() {
-        const TWITCH_WEBSOCKET_URL: &str = "ws://127.0.0.1:8080/ws";
-        const TWITCH_API_URL: &str = "http://localhost:8080/eventsub/subscriptions";
-        let twitch_user_access_token = Arc::new(None);
-        let (restart_signal_sender, _) = mpsc::channel(1);
-
-        use super::*;
-        use tokio::sync::mpsc;
-        use tokio::task;
-
-        let (id_sender, id_reciever) = mpsc::channel(10);
-        let (socket_sender, mut socket_reciever) = mpsc::channel(10);
-
-        task::spawn(async {
-            twitch_websocket(
-                id_reciever,
-                socket_sender,
-                restart_signal_sender,
-                TWITCH_WEBSOCKET_URL,
-                TWITCH_API_URL,
-                twitch_user_access_token,
-                "AAAA",
-            )
-            .await;
-        });
-        id_sender.send(641_972_806).await.unwrap();
-        assert_eq!(
-            socket_reciever.recv().await,
-            Some((String::from("live"), String::from("kaicenat")))
-        );
-        id_sender.send(411_377_640).await.unwrap();
-        assert_eq!(
-            socket_reciever.recv().await,
-            Some((String::from("live"), String::from("jynxzi")))
-        );
-        id_sender.send(207_813_352).await.unwrap();
-        assert_eq!(
-            socket_reciever.recv().await,
-            Some((String::from("live"), String::from("hasanabi")))
-        );
     }
 }
