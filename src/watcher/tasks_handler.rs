@@ -190,7 +190,14 @@ async fn handle_exit_status<'a>(
                 }
                 Err(error) => {
                     wait_time = match wait_time.cmp(&MAX_WAIT_TIME) {
-                        std::cmp::Ordering::Less => wait_time * 2,
+                        std::cmp::Ordering::Less => {
+                            let time = wait_time * 2;
+                            if time > MAX_WAIT_TIME {
+                                MAX_WAIT_TIME
+                            } else {
+                                time
+                            }
+                        }
                         std::cmp::Ordering::Equal => wait_time,
                         std::cmp::Ordering::Greater => MAX_WAIT_TIME,
                     };

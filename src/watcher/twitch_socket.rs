@@ -361,7 +361,14 @@ async fn reconnect_websocket(
             native_tls::TlsConnector::new().expect("Unable to find TLS configuration"),
         );
         time = match time.cmp(&MAX_WAIT) {
-            std::cmp::Ordering::Less => time * 2,
+            std::cmp::Ordering::Less => {
+                let time = time * 2;
+                if time > MAX_WAIT {
+                    MAX_WAIT
+                } else {
+                    time
+                }
+            }
             std::cmp::Ordering::Greater => MAX_WAIT,
             std::cmp::Ordering::Equal => time,
         };
@@ -438,7 +445,14 @@ async fn subscribe_to_event(
             }
             Err(error) => {
                 match time.cmp(&MAX_WAIT) {
-                    std::cmp::Ordering::Less => time * 2,
+                    std::cmp::Ordering::Less => {
+                        let time = time * 2;
+                        if time > MAX_WAIT {
+                            MAX_WAIT
+                        } else {
+                            time
+                        }
+                    }
                     std::cmp::Ordering::Greater => MAX_WAIT,
                     std::cmp::Ordering::Equal => time,
                 };
