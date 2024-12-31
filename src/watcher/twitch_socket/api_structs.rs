@@ -178,7 +178,7 @@ pub struct SearchData {
     pub display_name: String,
     game_id: String,
     game_name: String,
-    id: String,
+    pub id: String,
     tag_ids: Option<Vec<String>>,
     tags: Vec<String>,
     pub is_live: bool,

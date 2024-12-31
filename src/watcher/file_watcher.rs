@@ -38,23 +38,14 @@ pub async fn file_watcher(
     streams: &Arc<Mutex<Streams>>,
 ) {
     let streams_clone = streams.lock().expect("Mutex lock poisoned").clone();
-    let streamers = streams_clone.names.into_iter();
-    let mut quality_iter = streams_clone.quality_overides.into_iter();
-    let mut open_on_iter = streams_clone.streams_to_open_on.into_iter();
-    let mut close_on_iter = streams_clone.streams_to_close_on.into_iter();
+    let streamers = streams_clone.streams.into_iter();
     for streamer in streamers {
         file_watcher_twitch_websocket_sender
-            .send(streamer.1)
+            .send(streamer.id)
             .await
             .expect("Twitch websocket reciever is closed");
         file_watcher_event_handler_sender
-            .send(StreamConfig {
-                name: streamer.0,
-                id: streamer.1,
-                quality_overides: quality_iter.next().unwrap_or_default(),
-                streams_to_close_on: open_on_iter.next().unwrap_or_default(),
-                streams_to_open_on: close_on_iter.next().unwrap_or_default(),
-            })
+            .send(streamer)
             .await
             .expect("Event handler reciever is closed");
     }
