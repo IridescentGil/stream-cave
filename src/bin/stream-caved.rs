@@ -26,8 +26,7 @@ async fn main() {
 
     if let Some(config_path) = flags.config {
         paths.push(config_path);
-    } else if let Some(dirs) = directories::ProjectDirs::from("com", "Iridescent", "Stream Watcher")
-    {
+    } else if let Some(dirs) = directories::ProjectDirs::from("com", "Iridescent", "Stream Cave") {
         paths.push(dirs.config_local_dir().to_owned());
         paths.push(dirs.config_dir().to_owned());
     }

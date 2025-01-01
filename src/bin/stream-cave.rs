@@ -82,7 +82,7 @@ const SEARCH_CHANNEL_API: &str = "https://api.twitch.tv/helix/search/channels";
 #[tokio::main]
 async fn main() {
     let args = Cli::parse();
-    let system_paths = directories::ProjectDirs::from("com", "Iridescent", "Stream Watcher");
+    let system_paths = directories::ProjectDirs::from("com", "Iridescent", "Stream Cave");
 
     match &args.command {
         Commands::Play(play) => {
