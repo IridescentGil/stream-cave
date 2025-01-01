@@ -318,11 +318,21 @@ mod tests {
         let (exit_sender, exit_reciever) = mpsc::channel(10);
         let (restart_signal_sender, _) = mpsc::channel(1);
 
-        let mut child = Command::new("twitch-cli")
+        let mut child = match Command::new("twitch-cli")
             .args(["mock-api", "start", "-p", &PORT.to_string()])
             .kill_on_drop(true)
             .spawn()
-            .unwrap();
+        {
+            Ok(child) => child,
+            Err(ref error) if error.kind() == std::io::ErrorKind::NotFound => {
+                Command::new("twitch")
+                    .args(["mock-api", "start", "-p", &PORT.to_string()])
+                    .kill_on_drop(true)
+                    .spawn()
+                    .unwrap()
+            }
+            Err(error) => panic!("{error}"),
+        };
 
         task::spawn(async {
             sleep(Duration::from_secs(2)).await;
@@ -360,11 +370,21 @@ mod tests {
         let (exit_sender, mut exit_reciever) = mpsc::channel(10);
         let (restart_signal_sender, _) = mpsc::channel(1);
 
-        let mut child = Command::new("twitch-cli")
+        let mut child = match Command::new("twitch-cli")
             .args(["mock-api", "start", "-p", &PORT.to_string()])
             .kill_on_drop(true)
             .spawn()
-            .unwrap();
+        {
+            Ok(child) => child,
+            Err(ref error) if error.kind() == std::io::ErrorKind::NotFound => {
+                Command::new("twitch")
+                    .args(["mock-api", "start", "-p", &PORT.to_string()])
+                    .kill_on_drop(true)
+                    .spawn()
+                    .unwrap()
+            }
+            Err(error) => panic!("{error}"),
+        };
 
         task::spawn(async {
             sleep(Duration::from_secs(2)).await;
@@ -407,11 +427,21 @@ mod tests {
         let (exit_sender, exit_reciever) = mpsc::channel(10);
         let (restart_signal_sender, _) = mpsc::channel(1);
 
-        let mut child = Command::new("twitch-cli")
+        let mut child = match Command::new("twitch-cli")
             .args(["mock-api", "start", "-p", &PORT.to_string()])
             .kill_on_drop(true)
             .spawn()
-            .unwrap();
+        {
+            Ok(child) => child,
+            Err(ref error) if error.kind() == std::io::ErrorKind::NotFound => {
+                Command::new("twitch")
+                    .args(["mock-api", "start", "-p", &PORT.to_string()])
+                    .kill_on_drop(true)
+                    .spawn()
+                    .unwrap()
+            }
+            Err(error) => panic!("{error}"),
+        };
 
         task::spawn(async {
             sleep(Duration::from_secs(2)).await;
@@ -449,11 +479,21 @@ mod tests {
         let (exit_sender, exit_reciever) = mpsc::channel(10);
         let (restart_signal_sender, _) = mpsc::channel(1);
 
-        let mut child = Command::new("twitch-cli")
+        let mut child = match Command::new("twitch-cli")
             .args(["mock-api", "start", "-p", &PORT.to_string()])
             .kill_on_drop(true)
             .spawn()
-            .unwrap();
+        {
+            Ok(child) => child,
+            Err(ref error) if error.kind() == std::io::ErrorKind::NotFound => {
+                Command::new("twitch")
+                    .args(["mock-api", "start", "-p", &PORT.to_string()])
+                    .kill_on_drop(true)
+                    .spawn()
+                    .unwrap()
+            }
+            Err(error) => panic!("{error}"),
+        };
 
         // FIX the next part can happen before the server is fully up,
         // causing the test to fail.

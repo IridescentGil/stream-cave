@@ -494,11 +494,21 @@ mod tests {
         let (socket_sender, mut socket_reciever) = mpsc::channel(10);
         let (restart_signal_sender, _) = mpsc::channel(1);
 
-        let mut child = process::Command::new("twitch-cli")
+        let mut child = match process::Command::new("twitch-cli")
             .args(["event", "websocket", "start-server", "-S", "-p", "3200"])
             .kill_on_drop(true)
             .spawn()
-            .unwrap();
+        {
+            Ok(child) => child,
+            Err(ref error) if error.kind() == std::io::ErrorKind::NotFound => {
+                process::Command::new("twitch")
+                    .args(["event", "websocket", "start-server", "-S", "-p", "3200"])
+                    .kill_on_drop(true)
+                    .spawn()
+                    .unwrap()
+            }
+            Err(error) => panic!("{error}"),
+        };
 
         task::spawn(async {
             twitch_websocket(
@@ -515,11 +525,21 @@ mod tests {
         id_sender.send(30_423_375).await.unwrap();
 
         sleep(Duration::from_secs(5)).await;
-        process::Command::new("twitch-cli")
+        match process::Command::new("twitch-cli")
             .args(["event", "trigger", "stream.online", "--transport=websocket"])
             .output()
             .await
-            .unwrap();
+        {
+            Ok(child) => child,
+            Err(ref error) if error.kind() == std::io::ErrorKind::NotFound => {
+                process::Command::new("twitch")
+                    .args(["event", "trigger", "stream.online", "--transport=websocket"])
+                    .output()
+                    .await
+                    .unwrap()
+            }
+            Err(error) => panic!("{error}"),
+        };
         assert_eq!(
             timeout(Duration::from_secs(15), socket_reciever.recv())
                 .await
