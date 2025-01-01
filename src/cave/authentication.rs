@@ -32,6 +32,7 @@ use twitch_oauth2::{
 pub async fn validate_oauth_token(
     user_access_token: &mut Option<UserToken>,
     path: &Path,
+    retry: bool,
 ) -> Result<(), Box<dyn std::error::Error + Sync + Send>> {
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
@@ -66,6 +67,8 @@ pub async fn validate_oauth_token(
                     }
                 }
             }
+        } else if !retry {
+            return Err(String::from("Token does not exist").into());
         } else {
             eprintln!("No existing token, Please create token. Rechecking in 60 seconds.");
             tokio::time::sleep(Duration::from_secs(60)).await;

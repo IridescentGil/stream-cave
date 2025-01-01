@@ -159,6 +159,7 @@ impl Streams {
                     Self::new()
                 }
             },
+            Err(ref error) if error.kind() == std::io::ErrorKind::NotFound => Self::new(),
             Err(error) => {
                 eprint!("Error opening file: {error}");
                 Self::new()
@@ -498,7 +499,19 @@ impl UserData {
     /// ```
     pub fn save(&self, path: &Path) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let token_string = serde_json::to_string(self)?;
-        std::fs::write(path, token_string)?;
+        let Some(parent) = path.parent() else {
+            return Err(String::from("Invalid path string").into());
+        };
+
+        match std::fs::create_dir(parent) {
+            Ok(()) => {
+                std::fs::write(path, token_string)?;
+            }
+            Err(ref error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                std::fs::write(path, token_string)?;
+            }
+            Err(error) => return Err(error.into()),
+        }
         Ok(())
     }
 }

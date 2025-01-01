@@ -157,6 +157,7 @@ async fn main() {
                     if let Err(error) = stream_cave::authentication::validate_oauth_token(
                         &mut user_access_token,
                         &config_option,
+                        false,
                     )
                     .await
                     {

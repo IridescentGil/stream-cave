@@ -47,7 +47,7 @@ async fn run(settings: &Arc<Settings>, streams: &Arc<Mutex<Streams>>) {
     loop {
         let mut token: Option<twitch_oauth2::tokens::UserToken> = None;
         loop {
-            match authentication::validate_oauth_token(&mut token, &settings.schedule).await {
+            match authentication::validate_oauth_token(&mut token, &settings.schedule, true).await {
                 Ok(()) => break,
                 Err(error) => {
                     eprintln!(
