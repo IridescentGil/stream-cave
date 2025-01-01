@@ -1,4 +1,4 @@
-name: Build on Linux with Clang through Nix
+name: Build on Linux with Nix
 
 on:
   push:
