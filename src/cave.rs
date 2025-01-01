@@ -463,6 +463,7 @@ impl UserData {
     /// let user_data = UserData::from_token(token.as_ref().unwrap());
     /// }
     /// ```
+    #[must_use]
     pub fn from_token(token: &UserToken) -> Self {
         Self {
             access_token: token.access_token.secret().to_string(),

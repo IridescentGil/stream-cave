@@ -45,9 +45,9 @@
 
           UseNextest = true;
           checkFlags = [
-            "--skip watcher::twitch_socket"
-            "--skip watcher::player"
-            "--skip watcher::tasks_handler"
+            "--skip cave::twitch_socket"
+            "--skip cave::player"
+            "--skip cave::tasks_handler"
           ];
         };
         devShells.default = pkgs.mkShell {

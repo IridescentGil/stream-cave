@@ -1,8 +1,8 @@
-use crate::watcher::twitch_socket::api_structs;
+use crate::cave::twitch_socket::api_structs;
 use std::{process::ExitStatus, sync::Arc, time::Duration};
 use twitch_oauth2::UserToken;
 
-use crate::{watcher::player, Player};
+use crate::{cave::player, Player};
 use tokio::{
     sync::mpsc::{Receiver, Sender},
     task,

@@ -1,4 +1,4 @@
-use crate::watcher::Streams;
+use crate::cave::Streams;
 use std::{
     path::Path,
     sync::{Arc, Mutex},
@@ -54,7 +54,7 @@ pub async fn file_watcher(
 
 #[cfg(test)]
 mod test {
-    use crate::watcher::StreamConfig;
+    use crate::cave::StreamConfig;
 
     use super::*;
 
