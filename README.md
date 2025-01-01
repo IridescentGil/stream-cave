@@ -1,7 +1,6 @@
 # stream-cave
 
 stream-cave is a rust program to monitor livestreams and play them when they go live.
-stream-cave is currently under development and does not have a working version.
 
 ## Building
 
