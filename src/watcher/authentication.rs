@@ -20,7 +20,7 @@ use twitch_oauth2::{
 /// ```no_run
 /// #[tokio::main]
 /// async fn main() {
-/// use stream_watcher::authentication::validate_oauth_token;
+/// use stream_cave::authentication::validate_oauth_token;
 /// use std::path::Path;
 ///
 /// let mut token = None;
@@ -87,7 +87,7 @@ pub async fn validate_oauth_token(
 /// #[tokio::main]
 /// async fn main() {
 /// use std::path::Path;
-/// use stream_watcher::create_oauth_token;
+/// use stream_cave::create_oauth_token;
 ///
 /// let client_id = "someclientid";
 /// let path = Path::new("./");

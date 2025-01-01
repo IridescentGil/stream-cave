@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use stream_watcher::{
+use stream_cave::{
     authentication, event_handler, file_watcher, tasks_handler, twitch_socket, Settings, Streams,
 };
 use tokio::{sync::mpsc, task};

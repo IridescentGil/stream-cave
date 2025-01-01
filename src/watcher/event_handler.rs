@@ -16,8 +16,8 @@ use super::StreamConfig;
 /// # Examples
 /// ```
 /// use tokio::sync::mpsc;
-/// use stream_watcher::event_handler;
-/// use stream_watcher::StreamConfig;
+/// use stream_cave::event_handler;
+/// use stream_cave::StreamConfig;
 ///
 /// #[tokio::main]
 /// async fn main() {

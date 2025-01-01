@@ -6,8 +6,8 @@ use tokio::process::Command;
 ///
 /// # Examples
 /// ```no_run
-/// use stream_watcher::get_stream;
-/// use stream_watcher::Player;
+/// use stream_cave::get_stream;
+/// use stream_cave::Player;
 ///
 /// #[tokio::main]
 /// async fn main(){

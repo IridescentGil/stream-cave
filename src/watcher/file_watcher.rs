@@ -16,7 +16,7 @@ use super::StreamConfig;
 ///
 /// # Examples
 /// ```
-/// use stream_watcher::{Settings, Streams, file_watcher};
+/// use stream_cave::{Settings, Streams, file_watcher};
 /// use tokio::sync::mpsc;
 /// use std::path::Path;
 /// use std::sync::{Arc, Mutex};

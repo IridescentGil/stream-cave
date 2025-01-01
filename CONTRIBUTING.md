@@ -1,8 +1,8 @@
-# Contributing to stream-watcher
+# Contributing to stream-cave
 
-First off, thank you for considering contributing to stream-watcher. It's people like you that will make stream-watcher a great tool.
+First off, thank you for considering contributing to stream-cave. It's people like you that will make stream-cave a great tool.
 
-The following is a set of guidelines for contributing to stream-watcher. These are mostly guidelines, not rules. Use your best judgment, and feel free to propose changes to this document in a pull request. Be aware that there are many ways to contribute, from writing tutorials or blog posts, improving the documentation, submitting bug reports and feature requests or writing code. Please ensure you adhere to our [Code of Conduct](CODE_OF_CONDUCT.md)
+The following is a set of guidelines for contributing to stream-cave. These are mostly guidelines, not rules. Use your best judgment, and feel free to propose changes to this document in a pull request. Be aware that there are many ways to contribute, from writing tutorials or blog posts, improving the documentation, submitting bug reports and feature requests or writing code. Please ensure you adhere to our [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## How can I contribute
 
@@ -62,29 +62,29 @@ When a commit is split, each commit should still be a valid state (tests passing
 | `bug` | Confirmed bugs or reports that are very likely to be bugs. |
 | `question` | Questions more than bug reports or feature requests (e.g. how do I do X). |
 | `feedback` | General feedback more than bug reports or feature requests. |
-| `help-wanted` | The stream-watcher developers would appreciate help from the community in resolving these issues. |
-| `beginner` | Less complex issues which would be good first issues to work on for users who want to contribute to stream-watcher. |
+| `help-wanted` | The stream-cave developers would appreciate help from the community in resolving these issues. |
+| `beginner` | Less complex issues which would be good first issues to work on for users who want to contribute to stream-cave. |
 | `more-information-needed` | More information needs to be collected about these problems or feature requests (e.g. steps to reproduce). |
 | `needs-reproduction` | Likely bugs, but haven't been reliably reproduced. |
 | `blocked` | Issues blocked on other issues. |
 | `duplicate` | Issues which are duplicates of other issues, i.e. they have been reported before. |
-| `wontfix` | The stream-watcher developers has decided not to fix these issues for now, either because they're working as intended or for some other reason. |
+| `wontfix` | The stream-cave developers has decided not to fix these issues for now, either because they're working as intended or for some other reason. |
 | `invalid` | Issues which aren't valid (e.g. user errors). |
 
 #### Topic Categories
 
 | Label name | Description |
 | --- | --- |
-| `windows` | Related to stream-watcher running on Windows. |
-| `linux` | Related to stream-watcher running on Linux. |
-| `mac` | Related to stream-watcher running on macOS. |
-| `build-error` | Related to problems with building stream-watcher from source. |
+| `windows` | Related to stream-cave running on Windows. |
+| `linux` | Related to stream-cave running on Linux. |
+| `mac` | Related to stream-cave running on macOS. |
+| `build-error` | Related to problems with building stream-cave from source. |
 | `documentation` | Related to any type of documentation. |
 | `performance` | Related to performance. |
 | `security` | Related to security. |
 | `ui` | Related to visual design. |
 | `uncaught-exception` | Issues about uncaught exceptions. |
-| `crash` | Reports of stream-watcher completely crashing. |
+| `crash` | Reports of stream-cave completely crashing. |
 | `encoding` | Related to character encoding. |
 | `git` | Related to Git functionality (e.g. problems with gitignore files or with showing the correct file status). |
 
@@ -93,7 +93,7 @@ When a commit is split, each commit should still be a valid state (tests passing
 | Label name | Description
 | --- | --- |
 | `work-in-progress` | Pull requests which are still being worked on, more changes will follow. |
-| `needs-review` | Pull requests which need code review, and approval from stream-watcher developers. |
-| `under-review` | Pull requests being reviewed by stream-watcher developers. |
+| `needs-review` | Pull requests which need code review, and approval from stream-cave developers. |
+| `under-review` | Pull requests being reviewed by stream-cave developers. |
 | `requires-changes` | Pull requests which need to be updated based on review comments and then reviewed again. |
 | `needs-testing` | Pull requests which need manual testing. |

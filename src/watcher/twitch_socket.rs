@@ -32,7 +32,7 @@ use tokio_tungstenite::{
 /// use tokio::sync::mpsc;
 /// use std::sync::Arc;
 /// use std::path::Path;
-/// use stream_watcher::{Settings, twitch_socket, authentication};
+/// use stream_cave::{Settings, twitch_socket, authentication};
 ///
 /// #[tokio::main]
 /// async fn main(){

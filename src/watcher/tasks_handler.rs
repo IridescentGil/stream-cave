@@ -14,8 +14,8 @@ use tokio::{
 ///
 /// # Examples
 /// ```no_run
-/// use stream_watcher::tasks_handler::task_spawner;
-/// use stream_watcher::Player;
+/// use stream_cave::tasks_handler::task_spawner;
+/// use stream_cave::Player;
 ///
 /// use tokio::sync::mpsc;
 ///
@@ -59,9 +59,9 @@ pub async fn task_spawner(
 ///
 /// # Examples
 /// ```no_run
-/// use stream_watcher::tasks_handler::{task_spawner, exit_handler};
-/// use stream_watcher::authentication;
-/// use stream_watcher::{Player, Settings};
+/// use stream_cave::tasks_handler::{task_spawner, exit_handler};
+/// use stream_cave::authentication;
+/// use stream_cave::{Player, Settings};
 ///
 /// use tokio::sync::mpsc;
 /// use std::sync::Arc;

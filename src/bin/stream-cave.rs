@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
-use stream_watcher::{create_oauth_token, Streams};
+use stream_cave::{create_oauth_token, Streams};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -86,20 +86,20 @@ async fn main() {
 
     match &args.command {
         Commands::Play(play) => {
-            let player = stream_watcher::Player::Mpv;
+            let player = stream_cave::Player::Mpv;
             let website = "https://www.twitch.tv/";
             let stream = format!("{}{}", website, play.stream.clone());
             if let Some(quality) = &play.quality {
                 match quality.parse::<u16>() {
                     Ok(number) => {
-                        stream_watcher::get_stream(player, stream, number)
+                        stream_cave::get_stream(player, stream, number)
                             .await
                             .await
                             .expect("Unable to play stream");
                     }
                     Err(_) => {
                         if quality == "audio" {
-                            stream_watcher::get_stream(player, stream, 0)
+                            stream_cave::get_stream(player, stream, 0)
                                 .await
                                 .await
                                 .expect("Unable to play stream");
@@ -109,7 +109,7 @@ async fn main() {
                     }
                 }
             } else {
-                stream_watcher::get_stream(player, stream, 1080)
+                stream_cave::get_stream(player, stream, 1080)
                     .await
                     .await
                     .expect("Unable to play stream");
@@ -154,7 +154,7 @@ async fn main() {
             match &stream.action {
                 StreamActions::Add(action) => {
                     let mut user_access_token: Option<twitch_oauth2::tokens::UserToken> = None;
-                    if let Err(error) = stream_watcher::authentication::validate_oauth_token(
+                    if let Err(error) = stream_cave::authentication::validate_oauth_token(
                         &mut user_access_token,
                         &config_option,
                     )

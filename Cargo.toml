@@ -1,5 +1,5 @@
 [package]
-name = "stream-watcher"
+name = "stream-cave"
 version = "0.1.0"
 edition = "2021"
 
@@ -24,9 +24,9 @@ pedantic = "warn"
 nursery = "warn"
 
 [[bin]]
-name = "stream-watcher"
-path = "src/bin/stream-watcher.rs"
+name = "stream-cave"
+path = "src/bin/stream-cave.rs"
 
 [[bin]]
-name = "stream-watcherd"
-path = "src/bin/stream-watcherd.rs"
+name = "stream-caved"
+path = "src/bin/stream-caved.rs"

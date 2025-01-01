@@ -35,7 +35,7 @@ impl Settings {
     /// # Examples
     /// ```
     /// use std::path::{Path, PathBuf};
-    /// use stream_watcher::{Player, Settings};
+    /// use stream_cave::{Player, Settings};
     /// let settings = Settings::new(Path::new("./"));
     ///
     /// assert_eq!(Player::Mpv, settings.player);
@@ -64,7 +64,7 @@ impl Settings {
     /// # Examples
     /// ```no_run
     /// use std::path::PathBuf;
-    /// use stream_watcher::Settings;
+    /// use stream_cave::Settings;
     ///
     /// let mut paths = Vec::new();
     /// paths.push(PathBuf::from("./"));
@@ -127,7 +127,7 @@ impl Streams {
     ///
     /// # Examples
     /// ```
-    /// use stream_watcher::Streams;
+    /// use stream_cave::Streams;
     ///
     /// let streams = Streams::new();
     /// ```
@@ -142,7 +142,7 @@ impl Streams {
     ///
     /// # Examples
     /// ```no_run
-    /// use stream_watcher::Streams;
+    /// use stream_cave::Streams;
     /// use std::path::Path;
     ///
     /// let path = Path::new("./");
@@ -175,7 +175,7 @@ impl Streams {
     /// # Examples
     /// ```no_run
     /// use std::path::Path;
-    /// use stream_watcher::Streams;
+    /// use stream_cave::Streams;
     ///
     /// let path = Path::new("./");
     /// let streams = Streams::new();
@@ -208,8 +208,8 @@ impl Streams {
     ///
     /// # Examples
     /// ```no_run
-    /// use stream_watcher::Streams;
-    /// use stream_watcher::authentication::validate_oauth_token;
+    /// use stream_cave::Streams;
+    /// use stream_cave::authentication::validate_oauth_token;
     /// use twitch_oauth2::UserToken;
     /// use std::path::Path;
     ///
@@ -293,8 +293,8 @@ impl Streams {
     ///
     /// # Examples
     /// ```no_run
-    /// use stream_watcher::Streams;
-    /// use stream_watcher::authentication::validate_oauth_token;
+    /// use stream_cave::Streams;
+    /// use stream_cave::authentication::validate_oauth_token;
     /// use twitch_oauth2::UserToken;
     /// use std::path::Path;
     ///
@@ -353,7 +353,7 @@ impl Streams {
     ///
     /// # Examples
     /// ```no_run
-    /// use stream_watcher::Streams;
+    /// use stream_cave::Streams;
     /// use std::path::Path;
     ///
     /// let path = Path::new("./");
@@ -435,7 +435,7 @@ impl UserData {
     /// # Examples
     /// ```no_run
     /// use std::path::Path;
-    /// use stream_watcher::UserData;
+    /// use stream_cave::UserData;
     ///
     /// let path = Path::new("./user-data.json");
     /// let data = UserData::from_file(&path).unwrap();
@@ -448,8 +448,8 @@ impl UserData {
     ///
     /// # Examples
     /// ```no_run
-    /// use stream_watcher::UserData;
-    /// use stream_watcher::authentication::validate_oauth_token;
+    /// use stream_cave::UserData;
+    /// use stream_cave::authentication::validate_oauth_token;
     /// use twitch_oauth2::UserToken;
     /// use std::path::Path;
     ///
@@ -478,8 +478,8 @@ impl UserData {
     ///
     /// # Examples
     /// ```no_run
-    /// use stream_watcher::UserData;
-    /// use stream_watcher::authentication::validate_oauth_token;
+    /// use stream_cave::UserData;
+    /// use stream_cave::authentication::validate_oauth_token;
     /// use twitch_oauth2::UserToken;
     /// use std::path::Path;
     ///
