@@ -24,6 +24,8 @@ jobs:
       run: |
         brew install twitchdev/twitch/twitch-cli
         sudo apt install mpv yt-dlp
+        mkdir -p $HOME/.config/twitch-cli
+        cp tests/resources/twitch-cli/eventCache.db tests/resources/twitch-cli/.twitch-cli.env $HOME/.config/twitch-cli/
 
     - name: Build Binaries
       run: cargo build --verbose
