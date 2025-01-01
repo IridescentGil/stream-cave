@@ -2,9 +2,9 @@ name: Build on Linux with Nix
 
 on:
   push:
-    branches: [ "main", "dev" ]
+    branches: [ "main", "dev", "releases/**" ]
   pull_request:
-    branches: [ "main", "dev" ]
+    branches: [ "main", "dev", "releases/**"]
 
 env:
   BUILD_TYPE: Release
