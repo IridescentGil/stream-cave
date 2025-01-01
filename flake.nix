@@ -1,5 +1,5 @@
 {
-  description = "Stream Watcher flake";
+  description = "Stream Cave flake";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -25,7 +25,7 @@
       in
       {
         packages.default = pkgs.rustPlatform.buildRustPackage {
-          pname = "Stream Watcher";
+          pname = "Stream Cave";
           version = "0.1.0";
 
           src = ./.;
@@ -36,6 +36,7 @@
           buildInputs = with pkgs; [
             openssl
             mpv
+            yt-dlp
           ];
 
           nativeBuildInputs = with pkgs; [
@@ -54,6 +55,7 @@
           packages = with pkgs; [
             rust-bin.stable.latest.default
             twitch-cli
+            jq
             streamlink
             cargo-mutants
             cargo-nextest
