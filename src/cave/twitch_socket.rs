@@ -45,7 +45,7 @@ use tokio_tungstenite::{
 ///
 ///     let mut token = None;
 ///     let settings = Settings::new(&Path::new("./"));
-///     authentication::validate_oauth_token(&mut token, &settings.schedule).await.unwrap();
+///     authentication::validate_oauth_token(&mut token, &settings.schedule, false).await.unwrap();
 ///
 ///     let twitch_user_access_token = Arc::new(token);
 ///     twitch_socket::twitch_websocket(file_watcher_reciever, event_handler_sender,

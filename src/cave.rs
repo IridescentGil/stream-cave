@@ -221,7 +221,7 @@ impl Streams {
     /// let path = Path::new("./");
     /// let mut token = None;
     /// validate_oauth_token(&mut token,
-    /// &path).await.unwrap();
+    /// &path, false).await.unwrap();
     ///
     /// let mut streams = Streams::new();
     ///
@@ -306,7 +306,7 @@ impl Streams {
     /// let path = Path::new("./");
     /// let mut token = None;
     /// validate_oauth_token(&mut token,
-    /// &path).await.unwrap();
+    /// &path, false).await.unwrap();
     ///
     /// let mut streams = Streams::new();
     ///
@@ -459,7 +459,7 @@ impl UserData {
     /// let path = Path::new("./");
     /// let mut token = None;
     /// validate_oauth_token(&mut token,
-    /// &path).await.unwrap();
+    /// &path, false).await.unwrap();
     ///
     /// let user_data = UserData::from_token(token.as_ref().unwrap());
     /// }
@@ -490,7 +490,7 @@ impl UserData {
     /// let path = Path::new("./");
     /// let mut token = None;
     /// validate_oauth_token(&mut token,
-    /// &path).await.unwrap();
+    /// &path, false).await.unwrap();
     ///
     /// let user_data = UserData::from_token(token.as_ref().unwrap());
     ///

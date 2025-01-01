@@ -77,7 +77,7 @@ pub async fn task_spawner(
 ///     let (tx3, mut rx3) = mpsc::channel(5);
 ///     let (restart_sender, _) = mpsc::channel(1);
 ///
-///     authentication::validate_oauth_token(&mut token, &settings.schedule).await.unwrap();
+///     authentication::validate_oauth_token(&mut token, &settings.schedule, false).await.unwrap();
 ///     tx1.send((String::from("jynxzi"), 720)).await.unwrap();
 ///     task_spawner(rx1, tx2, Player::Mpv, String::from("https://www.twitch.tv/")).await;
 ///     let twitch_user_token = Arc::new(token);

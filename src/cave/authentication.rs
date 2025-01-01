@@ -26,7 +26,7 @@ use twitch_oauth2::{
 /// let mut token = None;
 /// let path = Path::new("./");
 ///
-/// validate_oauth_token(&mut token, &path).await.unwrap();
+/// validate_oauth_token(&mut token, &path, true).await.unwrap();
 /// }
 /// ```
 pub async fn validate_oauth_token(
