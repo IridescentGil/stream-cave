@@ -1,5 +1,5 @@
 use crate::Player;
-use std::{future::Future, process::ExitStatus};
+use std::{future::Future, process::Output};
 use tokio::process::Command;
 
 /// Play the given stream and return a future with the exit status.
@@ -23,7 +23,7 @@ pub async fn get_stream<'a, 'b>(
     player: Player,
     stream: String,
     quality: u16,
-) -> impl Future<Output = Result<ExitStatus, std::io::Error>> + 'a {
+) -> impl Future<Output = Result<Output, std::io::Error>> + 'a {
     match player {
         Player::Mpv => {
             let mut mpv: Command = Command::new("mpv");
@@ -36,7 +36,7 @@ pub async fn get_stream<'a, 'b>(
                     .arg("--no-resume-playback")
                     .arg(format!("--ytdl-format=best[height<=?{quality}]"));
             }
-            mpv.status()
+            mpv.output()
         }
         Player::Streamlink => {
             let mut streamlink: Command = Command::new("streamlink");
@@ -45,7 +45,7 @@ pub async fn get_stream<'a, 'b>(
             } else {
                 streamlink.arg(stream).arg(format!("{quality}p"));
             }
-            streamlink.status()
+            streamlink.output()
         }
     }
 }
@@ -60,6 +60,6 @@ mod tests {
 
         let exit_code = mpv.await.unwrap();
 
-        assert!(exit_code.success());
+        assert!(exit_code.status.success());
     }
 }

@@ -1,5 +1,5 @@
 use crate::cave::twitch_socket::api_structs;
-use std::{process::ExitStatus, sync::Arc, time::Duration};
+use std::{io::BufRead, process::Output, sync::Arc, time::Duration};
 use twitch_oauth2::UserToken;
 
 use crate::{cave::player, Player};
@@ -34,7 +34,7 @@ pub async fn task_spawner(
     mut task_spawner_event_handler_reciever: Receiver<(String, u16)>,
     task_spawner_exit_handler_sender: Sender<(
         String,
-        Result<std::process::ExitStatus, std::io::Error>,
+        Result<std::process::Output, std::io::Error>,
     )>,
     player: Player,
     website: String,
@@ -89,7 +89,7 @@ pub async fn task_spawner(
 pub async fn exit_handler(
     mut exit_handler_task_spawner_reciever: Receiver<(
         String,
-        Result<std::process::ExitStatus, std::io::Error>,
+        Result<std::process::Output, std::io::Error>,
     )>,
     exit_handler_event_handler_sender: Sender<(String, String)>,
     restart_signal_sender: Sender<u8>,
@@ -120,7 +120,7 @@ pub async fn exit_handler(
 
 async fn handle_exit_status<'a>(
     stream_name: String,
-    exit_status: ExitStatus,
+    exit_status: Output,
     exit_handler_event_handler_sender: &'a Sender<(String, String)>,
     restart_signal_sender: &'a Sender<u8>,
     api_url: &'a String,
@@ -131,8 +131,17 @@ async fn handle_exit_status<'a>(
         eprintln!("Error attempting to access Twitch oauth2 token. No token found.");
         return;
     };
+    let exit_message = exit_status
+        .stdout
+        .lines()
+        .find(|line| line.as_ref().map_or(false, |line| line.contains("Exiting")))
+        .unwrap_or_else(|| Ok(String::from("Error")))
+        .unwrap_or_else(|_| String::from("Error"));
 
-    if !exit_status.success() {
+    if !exit_status.status.success()
+        || exit_message.contains("End of file")
+        || exit_message.contains("Error")
+    {
         const MAX_WAIT_TIME: Duration = Duration::from_secs(180);
         let mut wait_time = Duration::from_secs(1);
         loop {
@@ -307,7 +316,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(fake_streamer_name, result_name);
-        assert_eq!(exit_status.unwrap(), result_status.unwrap());
+        assert_eq!(exit_status.unwrap(), result_status.unwrap().status);
     }
 
     #[tokio::test]
@@ -352,7 +361,7 @@ mod tests {
         process_sender
             .send((
                 String::from("fishermarston19"),
-                Command::new("ls").status().await,
+                Command::new("ls").output().await,
             ))
             .await
             .unwrap();
@@ -404,7 +413,7 @@ mod tests {
         process_sender
             .send((
                 String::from("fishermarston19"),
-                Command::new("ls").arg("nonexistent").status().await,
+                Command::new("ls").arg("nonexistent").output().await,
             ))
             .await
             .unwrap();
@@ -461,7 +470,7 @@ mod tests {
         process_sender
             .send((
                 String::from("gordongordon358"),
-                Command::new("ls").arg("nonexistent").status().await,
+                Command::new("ls").arg("nonexistent").output().await,
             ))
             .await
             .unwrap();
@@ -508,7 +517,7 @@ mod tests {
         process_sender
             .send((
                 String::from("fishermarston19"),
-                Command::new("ls").arg("nonexistent").status().await,
+                Command::new("ls").arg("nonexistent").output().await,
             ))
             .await
             .unwrap();
