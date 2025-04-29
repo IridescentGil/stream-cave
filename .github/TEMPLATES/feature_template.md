@@ -6,7 +6,7 @@ about: Suggest an idea for this project
 
 <!--
 
-Have you read stream-watcher's Code of Conduct? By filing an Issue, you are expected to comply with it, including treating everyone with respect: https://github.com/IridescentGil/stream-watcher/blob/master/CODE_OF_CONDUCT.md
+Have you read stream-cave's Code of Conduct? By filing an Issue, you are expected to comply with it, including treating everyone with respect: https://github.com/IridescentGil/stream-cave/blob/master/CODE_OF_CONDUCT.md
 
 -->
 
