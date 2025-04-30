@@ -35,8 +35,8 @@
 
           buildInputs = with pkgs; [
             openssl
-            mpv
-            yt-dlp
+            # mpv
+            # yt-dlp
           ];
 
           nativeBuildInputs = with pkgs; [
